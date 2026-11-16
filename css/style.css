@@ -727,9 +727,8 @@ body.drawer-open {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  overflow: hidden;
 }
 
 .price-item-checkbox {
@@ -741,21 +740,23 @@ body.drawer-open {
 }
 
 .price-item-text {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  overflow: hidden;
 }
 
 .price-item-name {
+  display: block;
   font-size: 14px;
   font-weight: 600;
   color: var(--text-main);
   word-break: break-word;
   overflow-wrap: anywhere;
   line-height: 1.35;
+  white-space: normal;
 }
 
 .price-item-meta {
@@ -1844,6 +1845,7 @@ body.drawer-open {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  width: 100%;
 }
 
 .price-item-meta {
@@ -1893,6 +1895,11 @@ body.drawer-open {
   }
 
   .price-item-left {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .price-item-text {
     width: 100%;
   }
 
