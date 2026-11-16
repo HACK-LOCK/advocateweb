@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <title>Advocate Customer &amp; Billing Portal</title>
-  <link rel="stylesheet" href="css/style.css?v=7.1">
+  <link rel="stylesheet" href="css/style.css?v=7.2">
 </head>
 <body>
   <div class="app-container">
@@ -355,20 +355,20 @@
     </div>
   </div>
 
-  <!-- Stock Management Modal -->
-  <div id="stock-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-content modal-content-lg stock-modal-content">
-      <div class="form-header">
+  <!-- Stock Management Page -->
+  <section id="stock-section" class="stock-page-section" style="display: none;">
+    <div class="stock-page-container">
+      <div class="form-header stock-page-header">
         <div class="modal-header-left">
-          <button type="button" id="btn-back-stock-modal" class="btn-modal-back" title="Back" aria-label="Back">
+          <button type="button" id="btn-back-stock-modal" class="btn-modal-back" title="Back" aria-label="Back to customers">
             <span class="btn-back-arrow">←</span><span>Back</span>
           </button>
           <div class="form-title-group">
-            <h3 class="form-title" style="font-size: 18px;">Stock Management</h3>
+            <h3 class="form-title" style="font-size: 20px;">Stock Management</h3>
             <span class="field-hint">View remaining stock, add stock to existing/new items, and review history</span>
           </div>
         </div>
-        <button type="button" id="btn-close-stock-modal" class="btn-close-x" aria-label="Close Stock Modal" title="Close">✕</button>
+        <button type="button" id="btn-close-stock-modal" class="btn-close-x" aria-label="Close Stock page" title="Close">✕</button>
       </div>
 
       <div class="stock-add-panel">
@@ -407,11 +407,11 @@
         <input type="search" id="stock-search-input" class="field-input stock-search-input" placeholder="Search items by name/category/stock...">
       </div>
 
-      <div id="stock-items-list" class="modal-scroll-list stock-items-list">
+      <div id="stock-items-list" class="stock-items-list stock-page-list">
         <!-- Stock items rendered dynamically -->
       </div>
     </div>
-  </div>
+  </section>
 
   <!-- Stock History Modal -->
   <div id="stock-history-modal" class="modal-overlay" style="display: none;">
@@ -480,8 +480,8 @@
   <div id="item-options-menu" class="item-options-menu" role="menu" style="display: none;"></div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=7.1"></script>
-  <script src="js/supabase.js?v=7.1"></script>
-  <script src="js/app.js?v=7.1"></script>
+  <script src="js/config.js?v=7.2"></script>
+  <script src="js/supabase.js?v=7.2"></script>
+  <script src="js/app.js?v=7.2"></script>
 </body>
 </html>

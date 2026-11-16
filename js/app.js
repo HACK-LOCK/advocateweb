@@ -110,7 +110,7 @@
   // Stock Management
   const linkStockManager = document.getElementById('link-stock-manager');
   const drawerStockAlertCount = document.getElementById('drawer-stock-alert-count');
-  const stockModal = document.getElementById('stock-modal');
+  const stockSection = document.getElementById('stock-section') || document.getElementById('stock-modal');
   const btnBackStockModal = document.getElementById('btn-back-stock-modal');
   const btnCloseStockModal = document.getElementById('btn-close-stock-modal');
   const stockItemSelect = document.getElementById('stock-item-select');
@@ -187,6 +187,8 @@
   }
 
   // Navigation Logic
+  const customersSection = document.querySelector('.customers-section');
+
   function setTab(tab) {
     currentTab = tab;
 
@@ -194,12 +196,20 @@
     if (navCustomers) navCustomers.classList.toggle('active', tab === 'customers');
     if (navSearch) navSearch.classList.toggle('active', tab === 'search');
 
+    if (stockSection) stockSection.style.display = tab === 'stock' ? 'block' : 'none';
+    if (customersSection) customersSection.style.display = (tab === 'stock' || tab === 'new-customer') ? 'none' : 'block';
+
     if (tab === 'new-customer') {
       formContainer.style.display = 'block';
       if (searchSection) searchSection.style.display = 'none';
       draftBar.style.display = 'none';
       if (floatingBottomBar) floatingBottomBar.style.display = 'none';
       fieldName.focus();
+    } else if (tab === 'stock') {
+      formContainer.style.display = 'none';
+      if (searchSection) searchSection.style.display = 'none';
+      draftBar.style.display = 'none';
+      if (floatingBottomBar) floatingBottomBar.style.display = 'none';
     } else {
       // 'customers' view
       formContainer.style.display = 'none';
@@ -295,8 +305,8 @@
         stockHistoryModal.style.display = 'none';
         return;
       }
-      if (stockModal && stockModal.style.display === 'flex') {
-        stockModal.style.display = 'none';
+      if (currentTab === 'stock') {
+        setTab('customers');
         return;
       }
       return;
@@ -1814,13 +1824,13 @@
   function onDrawerHomeClick() {
     closeDrawer();
 
-    // Close any open modals
+    // Close any open modals/pages
     if (priceListModal) priceListModal.style.display = 'none';
     if (itemHistoryModal) itemHistoryModal.style.display = 'none';
     if (itemEditModal) itemEditModal.style.display = 'none';
-    if (stockModal) stockModal.style.display = 'none';
     if (stockHistoryModal) stockHistoryModal.style.display = 'none';
     if (cloudModal) cloudModal.style.display = 'none';
+    // stock page handled by setTab below
 
     // Reset search if active
     if (searchInput && searchInput.value) {
@@ -2102,12 +2112,16 @@
 
   // Stock Management
   function closeStockModal() {
-    if (stockModal) stockModal.style.display = 'none';
+    if (currentTab === 'stock') {
+      setTab('customers');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (stockSection) stockSection.style.display = 'none';
   }
 
   function openStockModalView() {
-    if (!stockModal) return;
-    stockModal.style.display = 'flex';
+    setTab('stock');
   }
 
   function populateStockItemSelect() {
@@ -2204,6 +2218,7 @@
     renderStockItemsList();
     openStockModalView();
     updateDrawerCounts();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function submitStockAdd() {
