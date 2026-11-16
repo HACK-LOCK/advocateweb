@@ -47,10 +47,27 @@ alter table public.customer_items add column if not exists sales_unit text defau
 alter table public.customer_items add column if not exists pieces_per_unit integer default 1;
 alter table public.customer_items add column if not exists unit_description text;
 
+create table if not exists public.stock_movements (
+  id uuid primary key default gen_random_uuid(),
+  price_item_id uuid references public.price_items (id) on delete set null,
+  item_name text not null,
+  movement_type text not null check (movement_type in ('in', 'out', 'adjustment', 'set', 'sale', 'initial')),
+  quantity_delta integer not null default 0,
+  quantity_before integer not null default 0,
+  quantity_after integer not null default 0,
+  note text,
+  reference_id text,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_customer_items_customer
   on public.customer_items (customer_id);
 create index if not exists idx_customers_date
   on public.customers (customer_date desc);
+create index if not exists idx_stock_movements_item_date
+  on public.stock_movements (price_item_id, created_at desc);
+create index if not exists idx_stock_movements_created_at
+  on public.stock_movements (created_at desc);
 
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$
@@ -69,6 +86,7 @@ create trigger customers_updated_at
 alter table public.customers enable row level security;
 alter table public.price_items enable row level security;
 alter table public.customer_items enable row level security;
+alter table public.stock_movements enable row level security;
 
 drop policy if exists "Allow anon full access on customers" on public.customers;
 create policy "Allow anon full access on customers" on public.customers for all using (true) with check (true);
@@ -78,6 +96,9 @@ create policy "Allow anon full access on price_items" on public.price_items for 
 
 drop policy if exists "Allow anon full access on customer_items" on public.customer_items;
 create policy "Allow anon full access on customer_items" on public.customer_items for all using (true) with check (true);
+
+drop policy if exists "Allow anon full access on stock_movements" on public.stock_movements;
+create policy "Allow anon full access on stock_movements" on public.stock_movements for all using (true) with check (true);
 
 -- ---------------------------------------------------------------------------
 -- Optional packaged item catalog seed

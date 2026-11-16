@@ -107,6 +107,33 @@
   const cloudConnectionIndicator = document.getElementById('cloud-connection-indicator');
   const btnSaveCloud = document.getElementById('btn-save-cloud');
 
+  // Stock Management
+  const linkStockManager = document.getElementById('link-stock-manager');
+  const drawerStockAlertCount = document.getElementById('drawer-stock-alert-count');
+  const stockModal = document.getElementById('stock-modal');
+  const btnBackStockModal = document.getElementById('btn-back-stock-modal');
+  const btnCloseStockModal = document.getElementById('btn-close-stock-modal');
+  const stockItemSelect = document.getElementById('stock-item-select');
+  const stockNewNameGroup = document.getElementById('stock-new-name-group');
+  const stockNewPriceGroup = document.getElementById('stock-new-price-group');
+  const stockNewName = document.getElementById('stock-new-name');
+  const stockNewPrice = document.getElementById('stock-new-price');
+  const stockQtyInput = document.getElementById('stock-qty-input');
+  const stockNoteInput = document.getElementById('stock-note-input');
+  const btnStockAddSubmit = document.getElementById('btn-stock-add-submit');
+  const btnStockRefresh = document.getElementById('btn-stock-refresh');
+  const stockSearchInput = document.getElementById('stock-search-input');
+  const stockItemsList = document.getElementById('stock-items-list');
+  const stockHistoryModal = document.getElementById('stock-history-modal');
+  const btnBackStockHistory = document.getElementById('btn-back-stock-history');
+  const btnCloseStockHistoryModal = document.getElementById('btn-close-stock-history-modal');
+  const btnFooterBackStockHistory = document.getElementById('btn-footer-back-stock-history');
+  const btnFooterCloseStockHistory = document.getElementById('btn-footer-close-stock-history');
+  const stockHistoryTitle = document.getElementById('stock-history-title');
+  const stockHistorySubtitle = document.getElementById('stock-history-subtitle');
+  const stockHistoryList = document.getElementById('stock-history-list');
+  let stockSearchTerm = '';
+
   // Application State
   let allPriceItems = [];
   let selectedItemsMap = new Map(); // price_item_id -> { item, quantity }
@@ -151,6 +178,7 @@
     setupSearch();
     setupDrawer();
     setupModals();
+    setupStockManagement();
     setupItemEditModal();
     setupItemOptionsMenu();
     setupCloudSettings();
@@ -261,6 +289,14 @@
       }
       if (itemHistoryModal && itemHistoryModal.style.display === 'flex') {
         itemHistoryModal.style.display = 'none';
+        return;
+      }
+      if (stockHistoryModal && stockHistoryModal.style.display === 'flex') {
+        stockHistoryModal.style.display = 'none';
+        return;
+      }
+      if (stockModal && stockModal.style.display === 'flex') {
+        stockModal.style.display = 'none';
         return;
       }
       return;
@@ -1744,6 +1780,11 @@
     if (drawerItemsCount) {
       drawerItemsCount.textContent = allPriceItems.length;
     }
+    if (drawerStockAlertCount) {
+      const lowOrOut = (allPriceItems || []).filter(it => (Number(it.stockPieces) || 0) <= 0).length;
+      drawerStockAlertCount.textContent = String(lowOrOut);
+      drawerStockAlertCount.title = `${lowOrOut} item(s) out of stock`;
+    }
   }
 
   function setupDrawer() {
@@ -1764,6 +1805,10 @@
     if (drawerBtnNewCustomer) {
       drawerBtnNewCustomer.addEventListener('click', onDrawerNewCustomerClick);
     }
+
+    if (linkStockManager) {
+      linkStockManager.addEventListener('click', onDrawerStockClick);
+    }
   }
 
   function onDrawerHomeClick() {
@@ -1773,6 +1818,8 @@
     if (priceListModal) priceListModal.style.display = 'none';
     if (itemHistoryModal) itemHistoryModal.style.display = 'none';
     if (itemEditModal) itemEditModal.style.display = 'none';
+    if (stockModal) stockModal.style.display = 'none';
+    if (stockHistoryModal) stockHistoryModal.style.display = 'none';
     if (cloudModal) cloudModal.style.display = 'none';
 
     // Reset search if active
@@ -1793,6 +1840,11 @@
   function onDrawerNewCustomerClick() {
     closeDrawer();
     setTab('new-customer');
+  }
+
+  async function onDrawerStockClick() {
+    closeDrawer();
+    await openStockModal();
   }
 
   async function openItemsModal() {
@@ -2046,6 +2098,279 @@
       cloudConnectionIndicator.textContent = 'Offline (localStorage mode)';
       cloudConnectionIndicator.style.color = '#7A5A36';
     }
+  }
+
+  // Stock Management
+  function closeStockModal() {
+    if (stockModal) stockModal.style.display = 'none';
+  }
+
+  function openStockModalView() {
+    if (!stockModal) return;
+    stockModal.style.display = 'flex';
+  }
+
+  function populateStockItemSelect() {
+    if (!stockItemSelect) return;
+    const current = stockItemSelect.value;
+    stockItemSelect.innerHTML = '<option value="">Select existing item…</option><option value="__new__">+ New item</option>';
+    (allPriceItems || []).forEach(it => {
+      const opt = document.createElement('option');
+      opt.value = String(it.id);
+      opt.textContent = `${it.name} — ${it.stockPieces || 0} pcs`;
+      stockItemSelect.appendChild(opt);
+    });
+    if ([...stockItemSelect.options].some(o => o.value === current)) stockItemSelect.value = current;
+  }
+
+  function toggleStockNewItemFields() {
+    const isNew = stockItemSelect && stockItemSelect.value === '__new__';
+    if (stockNewNameGroup) stockNewNameGroup.style.display = isNew ? 'block' : 'none';
+    if (stockNewPriceGroup) stockNewPriceGroup.style.display = isNew ? 'block' : 'none';
+  }
+
+  function formatStockMovementType(type) {
+    const map = { in: 'Stock In', out: 'Stock Out', adjustment: 'Adjustment', set: 'Stock Set', sale: 'Sale', initial: 'Initial Stock' };
+    return map[type] || (type || 'Movement');
+  }
+
+  function renderStockItemsList() {
+    if (!stockItemsList) return;
+    stockItemsList.innerHTML = '';
+    const term = (stockSearchTerm || '').trim().toLowerCase();
+    let items = [...(allPriceItems || [])];
+    if (term) {
+      items = items.filter(it => {
+        const hay = `${it.name || ''} ${it.category || ''} ${it.unitDescription || ''} ${it.stockPieces || 0}`.toLowerCase();
+        return hay.includes(term);
+      });
+    }
+    if (items.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-items-notice';
+      empty.textContent = term ? 'No stock items match your search.' : 'No items found. Add a new item with stock above.';
+      stockItemsList.appendChild(empty);
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    items.forEach(it => {
+      const stock = parseInt(it.stockPieces, 10) || 0;
+      const ppu = parseInt(it.piecesPerUnit, 10) || 1;
+      const low = stock > 0 && stock <= Math.max(2, ppu);
+      const badgeClass = stock <= 0 ? 'out' : (low ? 'low' : 'ok');
+      const badgeText = stock <= 0 ? 'Out of stock' : (low ? 'Low stock' : 'In stock');
+      const card = document.createElement('div');
+      card.className = 'stock-item-card';
+      card.dataset.id = String(it.id);
+      card.innerHTML = `
+        <div class="stock-item-main">
+          <p class="stock-item-title">${escapeHtml(it.name || 'Item')}</p>
+          <p class="stock-item-meta">${escapeHtml(getItemPackagingText(it))}</p>
+          <div class="stock-badges">
+            <span class="stock-badge ${badgeClass}">${badgeText}</span>
+            <span class="stock-badge neutral">Remaining: ${stock} pcs${ppu > 1 ? ` (${Math.floor(stock / ppu)} unit${Math.floor(stock / ppu) === 1 ? '' : 's'})` : ''}</span>
+            <span class="stock-badge neutral">Price: ${formatCurrency(it.price)}/${escapeHtml(getSalesUnitLabel(it))}</span>
+          </div>
+          <div class="stock-inline-form" id="stock-inline-${escapeHtml(String(it.id))}" style="display:none;">
+            <div class="field-group">
+              <label class="field-label">Add quantity (pcs)</label>
+              <input type="number" class="field-input stock-inline-qty" min="1" step="1" placeholder="e.g. 10">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Note</label>
+              <input type="text" class="field-input stock-inline-note" placeholder="Optional note">
+            </div>
+            <div class="field-group">
+              <button type="button" class="btn-primary stock-inline-save">Save</button>
+            </div>
+          </div>
+        </div>
+        <div class="stock-item-actions">
+          <button type="button" class="btn-secondary stock-btn-quick-add">+ Add Stock</button>
+          <button type="button" class="btn-secondary stock-btn-history">History</button>
+          <button type="button" class="btn-secondary stock-btn-edit">Edit Item</button>
+        </div>
+      `;
+      frag.appendChild(card);
+    });
+    stockItemsList.appendChild(frag);
+  }
+
+  async function openStockModal() {
+    allPriceItems = await window.DataStore.getPriceItems();
+    populateStockItemSelect();
+    toggleStockNewItemFields();
+    renderStockItemsList();
+    openStockModalView();
+    updateDrawerCounts();
+  }
+
+  async function submitStockAdd() {
+    if (!btnStockAddSubmit) return;
+    const selected = stockItemSelect ? stockItemSelect.value : '';
+    const qty = parseInt(stockQtyInput ? stockQtyInput.value : '', 10);
+    const note = (stockNoteInput ? stockNoteInput.value : '').trim();
+
+    if (!selected) { alert('Please select an item or choose New item.'); return; }
+    if (isNaN(qty) || qty <= 0) { alert('Enter a valid stock quantity (pieces) greater than 0.'); if (stockQtyInput) stockQtyInput.focus(); return; }
+
+    btnStockAddSubmit.disabled = true;
+    try {
+      if (selected === '__new__') {
+        const name = (stockNewName ? stockNewName.value : '').trim();
+        const price = parseFloat(stockNewPrice ? stockNewPrice.value : '0');
+        if (!name) { alert('Enter new item name.'); if (stockNewName) stockNewName.focus(); return; }
+        if (isNaN(price) || price < 0) { alert('Enter a valid price for the new item.'); if (stockNewPrice) stockNewPrice.focus(); return; }
+        const created = await window.DataStore.addPriceItem(name, price, 'General', {
+          stockPieces: qty,
+          stockNote: note || 'Initial stock added while creating item'
+        });
+        if (!created) { alert('Could not create item.'); return; }
+      } else {
+        const result = await window.DataStore.adjustStock(selected, qty, 'add', note || 'Manual stock added');
+        if (!result) { alert('Could not update stock for selected item.'); return; }
+      }
+
+      allPriceItems = await window.DataStore.getPriceItems();
+      populateStockItemSelect();
+      renderStockItemsList();
+      renderPriceItemsInForm();
+      if (priceListModal && priceListModal.style.display === 'flex') renderPriceListModalItems();
+      updateDrawerCounts();
+      saveDraft();
+
+      if (stockQtyInput) stockQtyInput.value = '';
+      if (stockNoteInput) stockNoteInput.value = '';
+      if (selected === '__new__') {
+        if (stockNewName) stockNewName.value = '';
+        if (stockNewPrice) stockNewPrice.value = '';
+        if (stockItemSelect) stockItemSelect.value = '';
+        toggleStockNewItemFields();
+      }
+    } catch (e) {
+      console.error('Stock add failed', e);
+      alert('Failed to add/update stock. Please try again.');
+    } finally {
+      btnStockAddSubmit.disabled = false;
+    }
+  }
+
+  async function openStockHistoryModal(item) {
+    if (!stockHistoryModal) return;
+    if (stockHistoryTitle) stockHistoryTitle.textContent = item ? `Stock History: ${item.name}` : 'Stock History';
+    if (stockHistorySubtitle) stockHistorySubtitle.textContent = item ? 'Recent stock movements for this item' : 'Recent stock movements';
+    if (stockHistoryList) stockHistoryList.innerHTML = '<div class="empty-items-notice">Loading stock history...</div>';
+    stockHistoryModal.style.display = 'flex';
+    try {
+      const movements = await window.DataStore.getStockMovements(item ? item.id : null, 300);
+      renderStockHistoryList(movements, item);
+    } catch (e) {
+      if (stockHistoryList) stockHistoryList.innerHTML = '<div class="empty-items-notice">Could not load stock history.</div>';
+    }
+  }
+
+  function renderStockHistoryList(movements, item) {
+    if (!stockHistoryList) return;
+    stockHistoryList.innerHTML = '';
+    if (!movements || movements.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-items-notice';
+      empty.textContent = item ? 'No stock movements recorded for this item yet.' : 'No stock movements recorded yet.';
+      stockHistoryList.appendChild(empty);
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    movements.forEach(m => {
+      const delta = parseInt(m.quantity_delta, 10) || 0;
+      const deltaText = `${delta > 0 ? '+' : ''}${delta} pcs`;
+      const deltaClass = delta >= 0 ? 'pos' : 'neg';
+      const dateText = formatHistoryDate(m.created_at, true);
+      const row = document.createElement('div');
+      row.className = 'stock-history-item';
+      row.innerHTML = `
+        <div class="stock-history-top">
+          <div class="stock-history-type">${escapeHtml(formatStockMovementType(m.movement_type))}${item ? '' : ` — ${escapeHtml(m.item_name || 'Item')}`}</div>
+          <div class="stock-history-delta ${deltaClass}">${escapeHtml(deltaText)}</div>
+        </div>
+        <div class="stock-history-meta">
+          <span>Before: ${parseInt(m.quantity_before, 10) || 0} pcs</span>
+          <span>After: ${parseInt(m.quantity_after, 10) || 0} pcs</span>
+          <span>${escapeHtml(dateText)}</span>
+          ${m.reference_id ? `<span>Ref: ${escapeHtml(String(m.reference_id))}</span>` : ''}
+        </div>
+        ${m.note ? `<div class="stock-history-note">${escapeHtml(m.note)}</div>` : ''}
+      `;
+      frag.appendChild(row);
+    });
+    stockHistoryList.appendChild(frag);
+  }
+
+  function closeStockHistoryModal() {
+    if (stockHistoryModal) stockHistoryModal.style.display = 'none';
+  }
+
+  function setupStockManagement() {
+    if (btnBackStockModal) btnBackStockModal.addEventListener('click', closeStockModal);
+    if (btnCloseStockModal) btnCloseStockModal.addEventListener('click', closeStockModal);
+    if (btnStockAddSubmit) btnStockAddSubmit.addEventListener('click', submitStockAdd);
+    if (btnStockRefresh) btnStockRefresh.addEventListener('click', openStockModal);
+    if (stockItemSelect) stockItemSelect.addEventListener('change', toggleStockNewItemFields);
+    if (stockSearchInput) stockSearchInput.addEventListener('input', () => { stockSearchTerm = stockSearchInput.value || ''; renderStockItemsList(); });
+    if (stockQtyInput) stockQtyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitStockAdd(); } });
+
+    if (stockItemsList) {
+      stockItemsList.addEventListener('click', async (e) => {
+        const card = e.target.closest('.stock-item-card');
+        if (!card) return;
+        const itemId = card.dataset.id;
+        const item = (allPriceItems || []).find(it => String(it.id) === String(itemId));
+        if (!item) return;
+
+        if (e.target.closest('.stock-btn-history')) {
+          await openStockHistoryModal(item);
+          return;
+        }
+        if (e.target.closest('.stock-btn-edit')) {
+          openItemEditModal(item);
+          return;
+        }
+        if (e.target.closest('.stock-btn-quick-add')) {
+          const form = card.querySelector('.stock-inline-form');
+          if (form) form.style.display = form.style.display === 'none' ? 'grid' : 'none';
+          const qtyInput = card.querySelector('.stock-inline-qty');
+          if (qtyInput) qtyInput.focus();
+          return;
+        }
+        if (e.target.closest('.stock-inline-save')) {
+          const qtyInput = card.querySelector('.stock-inline-qty');
+          const noteInput = card.querySelector('.stock-inline-note');
+          const qty = parseInt(qtyInput ? qtyInput.value : '', 10);
+          const note = noteInput ? noteInput.value.trim() : '';
+          if (isNaN(qty) || qty <= 0) { alert('Enter a valid quantity to add.'); if (qtyInput) qtyInput.focus(); return; }
+          const btn = e.target.closest('.stock-inline-save');
+          if (btn) btn.disabled = true;
+          try {
+            await window.DataStore.adjustStock(item.id, qty, 'add', note || 'Manual stock added from stock manager');
+            allPriceItems = await window.DataStore.getPriceItems();
+            renderStockItemsList();
+            populateStockItemSelect();
+            renderPriceItemsInForm();
+            if (priceListModal && priceListModal.style.display === 'flex') renderPriceListModalItems();
+            updateDrawerCounts();
+          } finally {
+            if (btn) btn.disabled = false;
+          }
+        }
+      });
+    }
+
+    const closeHistory = () => closeStockHistoryModal();
+    if (btnBackStockHistory) btnBackStockHistory.addEventListener('click', closeHistory);
+    if (btnCloseStockHistoryModal) btnCloseStockHistoryModal.addEventListener('click', closeHistory);
+    if (btnFooterBackStockHistory) btnFooterBackStockHistory.addEventListener('click', closeHistory);
+    if (btnFooterCloseStockHistory) btnFooterCloseStockHistory.addEventListener('click', closeHistory);
   }
 
   // Application Entry Point

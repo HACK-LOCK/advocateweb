@@ -182,11 +182,14 @@ window.DataStore = {
     priceItems: null,
     priceItemsTime: 0,
     customerItems: new Map(), // customerId -> { items, timestamp }
+    stockMovements: null,
+    stockMovementsTime: 0,
   },
   CACHE_TTL_MS: 45000, // 45 seconds
 
   // Local price-change history (used by the item History modal)
   _priceHistoryKey: 'portal_price_history',
+  _stockMovementsKey: 'portal_stock_movements',
 
   _getPriceHistoryLog() {
     try {
@@ -207,6 +210,174 @@ window.DataStore = {
     } catch (e) {
       console.warn('Could not record price history:', e);
     }
+  },
+
+  _getStockMovementsLocal() {
+    try {
+      const raw = window.localStorage.getItem(this._stockMovementsKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  _saveStockMovementsLocal(movements) {
+    try {
+      const trimmed = (movements || []).slice(0, 2000);
+      window.localStorage.setItem(this._stockMovementsKey, JSON.stringify(trimmed));
+    } catch (e) {
+      console.warn('Could not save stock movements locally:', e);
+    }
+  },
+
+  async recordStockMovement(movement) {
+    if (!movement) return null;
+    const entry = {
+      id: movement.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'sm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)),
+      price_item_id: movement.price_item_id || null,
+      item_name: (movement.item_name || '').trim() || 'Item',
+      movement_type: movement.movement_type || 'adjustment',
+      quantity_delta: parseInt(movement.quantity_delta, 10) || 0,
+      quantity_before: parseInt(movement.quantity_before, 10) || 0,
+      quantity_after: parseInt(movement.quantity_after, 10) || 0,
+      note: movement.note || null,
+      reference_id: movement.reference_id || null,
+      created_at: movement.created_at || new Date().toISOString()
+    };
+
+    const local = this._getStockMovementsLocal();
+    local.unshift(entry);
+    this._saveStockMovementsLocal(local);
+    this._cache.stockMovements = null;
+    this._cache.stockMovementsTime = 0;
+
+    if (this.isSupabase()) {
+      try {
+        const payload = {
+          price_item_id: (entry.price_item_id && isValidUuid(String(entry.price_item_id))) ? entry.price_item_id : null,
+          item_name: entry.item_name,
+          movement_type: entry.movement_type,
+          quantity_delta: entry.quantity_delta,
+          quantity_before: entry.quantity_before,
+          quantity_after: entry.quantity_after,
+          note: entry.note,
+          reference_id: entry.reference_id,
+          created_at: entry.created_at
+        };
+        const res = await this._supabaseFetch('stock_movements', {
+          method: 'POST',
+          headers: { 'Prefer': 'return=representation' },
+          body: JSON.stringify(payload)
+        });
+        if (res && res[0]) {
+          const saved = { ...entry, ...res[0], id: res[0].id || entry.id };
+          const idx = local.findIndex(m => m.id === entry.id);
+          if (idx !== -1) local[idx] = saved; else local.unshift(saved);
+          this._saveStockMovementsLocal(local);
+          return saved;
+        }
+      } catch (e) {
+        console.warn('Could not save stock movement to Supabase:', e);
+      }
+    }
+    return entry;
+  },
+
+  async getStockMovements(itemId = null, limit = 200) {
+    const now = Date.now();
+    const normalizedId = itemId ? String(itemId) : null;
+
+    if (this.isSupabase()) {
+      try {
+        let path = `stock_movements?select=*&order=created_at.desc&limit=${Math.max(1, Math.min(limit, 1000))}`;
+        if (normalizedId && isValidUuid(normalizedId)) {
+          path = `stock_movements?select=*&price_item_id=eq.${normalizedId}&order=created_at.desc&limit=${Math.max(1, Math.min(limit, 1000))}`;
+        }
+        const data = await this._supabaseFetch(path);
+        if (Array.isArray(data)) {
+          const normalized = data.map(m => ({
+            id: m.id,
+            price_item_id: m.price_item_id,
+            item_name: m.item_name || '',
+            movement_type: m.movement_type || 'adjustment',
+            quantity_delta: parseInt(m.quantity_delta, 10) || 0,
+            quantity_before: parseInt(m.quantity_before, 10) || 0,
+            quantity_after: parseInt(m.quantity_after, 10) || 0,
+            note: m.note || '',
+            reference_id: m.reference_id || null,
+            created_at: m.created_at
+          }));
+          if (!normalizedId) {
+            this._cache.stockMovements = normalized;
+            this._cache.stockMovementsTime = now;
+          }
+          this._saveStockMovementsLocal(normalizedId ? this._mergeMovementsLocal(normalized) : normalized);
+          return normalized;
+        }
+      } catch (e) {
+        console.warn('Supabase fetch failed for stock movements, using local storage:', e);
+      }
+    }
+
+    let local = this._getStockMovementsLocal();
+    if (normalizedId) {
+      local = local.filter(m => String(m.price_item_id || '') === normalizedId || (m.item_name || '').toLowerCase() === String(itemId || '').toLowerCase());
+    }
+    return local.slice(0, limit);
+  },
+
+  _mergeMovementsLocal(incoming) {
+    const existing = this._getStockMovementsLocal();
+    const byId = new Map();
+    [...(incoming || []), ...existing].forEach(m => {
+      if (!m) return;
+      const key = String(m.id || `${m.price_item_id}-${m.created_at}-${m.quantity_after}`);
+      if (!byId.has(key)) byId.set(key, m);
+    });
+    return Array.from(byId.values()).sort((a,b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  },
+
+  async adjustStock(itemId, amountPieces, mode = 'add', note = '') {
+    const items = await this.getPriceItems();
+    const idx = items.findIndex(it => String(it.id) === String(itemId));
+    if (idx === -1) return null;
+    const item = items[idx];
+    const before = parseInt(item.stockPieces, 10) || 0;
+    const amt = parseInt(amountPieces, 10);
+    if (isNaN(amt)) return null;
+
+    let after = before;
+    let delta = 0;
+    let movementType = 'adjustment';
+    if (mode === 'set') {
+      after = Math.max(0, amt);
+      delta = after - before;
+      movementType = 'set';
+    } else if (mode === 'subtract') {
+      delta = -Math.max(0, amt);
+      after = Math.max(0, before + delta);
+      movementType = delta < 0 ? 'out' : 'adjustment';
+    } else {
+      delta = Math.max(0, amt);
+      after = before + delta;
+      movementType = delta > 0 ? 'in' : 'adjustment';
+    }
+
+    if (delta === 0 && mode !== 'set') return { item, movement: null };
+
+    await this.updatePriceItem(item.id, { stock_pieces: after }, { skipStockMovement: true });
+    const refreshed = (await this.getPriceItems()).find(it => String(it.id) === String(item.id)) || { ...item, stockPieces: after };
+    const movement = await this.recordStockMovement({
+      price_item_id: item.id,
+      item_name: item.name,
+      movement_type: movementType,
+      quantity_delta: delta,
+      quantity_before: before,
+      quantity_after: after,
+      note: note || (mode === 'set' ? 'Manual stock set' : (delta > 0 ? 'Manual stock added' : 'Manual stock reduced'))
+    });
+    return { item: refreshed, movement };
   },
 
   // Initialize store: upgrade to the packaged catalog and deduplicate customer records
@@ -358,7 +529,7 @@ window.DataStore = {
       baseCost: options.baseCost || 0,
       salesUnit: options.salesUnit || 'piece',
       piecesPerUnit: options.piecesPerUnit || 1,
-      stockPieces: options.stockPieces !== undefined ? parseInt(options.stockPieces, 10) : 100,
+      stockPieces: options.stockPieces !== undefined ? parseInt(options.stockPieces, 10) : 0,
       unitDescription: options.unitDescription || 'Single piece unit',
       is_active: true,
       created_at: new Date().toISOString()
@@ -395,6 +566,15 @@ window.DataStore = {
             window.localStorage.setItem('portal_price_items', JSON.stringify(updated));
             this._cache.priceItems = updated;
           }
+          await this.recordStockMovement({
+            price_item_id: (resNorm || newItem).id,
+            item_name: (resNorm || newItem).name,
+            movement_type: 'initial',
+            quantity_delta: parseInt((resNorm || newItem).stockPieces, 10) || 0,
+            quantity_before: 0,
+            quantity_after: parseInt((resNorm || newItem).stockPieces, 10) || 0,
+            note: options.stockNote || 'Initial stock on item creation'
+          });
           return resNorm;
         }
       } catch (e) {
@@ -402,11 +582,20 @@ window.DataStore = {
       }
     }
 
+    await this.recordStockMovement({
+      price_item_id: newItem.id,
+      item_name: newItem.name,
+      movement_type: 'initial',
+      quantity_delta: parseInt(newItem.stockPieces, 10) || 0,
+      quantity_before: 0,
+      quantity_after: parseInt(newItem.stockPieces, 10) || 0,
+      note: options.stockNote || 'Initial stock on item creation'
+    });
     return newItem;
   },
 
   // Update item price, stock level, name, or metadata (Price Override & Direct Stock Maintenance)
-  async updatePriceItem(id, updates = {}) {
+  async updatePriceItem(id, updates = {}, options = {}) {
     const currentItems = await this.getPriceItems();
     const index = currentItems.findIndex(it => String(it.id) === String(id));
     if (index === -1) return null;
@@ -434,6 +623,24 @@ window.DataStore = {
           old_price: oldPrice,
           new_price: newPrice,
           changed_at: new Date().toISOString()
+        });
+      }
+    }
+
+    // Record manual stock adjustments/sets when stock is changed directly
+    const stockChanged = (updates.stockPieces !== undefined || updates.stock_pieces !== undefined);
+    if (stockChanged && !options.skipStockMovement) {
+      const before = parseInt(current.stockPieces, 10) || 0;
+      const after = parseInt(updated.stockPieces, 10) || 0;
+      if (before !== after) {
+        await this.recordStockMovement({
+          price_item_id: updated.id,
+          item_name: updated.name,
+          movement_type: options.movementType || 'set',
+          quantity_delta: after - before,
+          quantity_before: before,
+          quantity_after: after,
+          note: options.stockNote || 'Stock updated from item edit'
         });
       }
     }
@@ -563,20 +770,21 @@ window.DataStore = {
   },
 
   // Automatic Stock Deduction when customer items are added/saved
-  async deductStock(billItems) {
+  async deductStock(billItems, context = {}) {
     if (!billItems || billItems.length === 0) return;
     const currentItems = await this.getPriceItems();
     let hasChanges = false;
 
     for (const billItem of billItems) {
       const itemId = String(billItem.price_item_id || billItem.id || '');
-      const matchIndex = currentItems.findIndex(it => String(it.id) === itemId || it.name === billItem.item_name);
+      const matchIndex = currentItems.findIndex(it => String(it.id) === itemId || it.name === (billItem.item_name || billItem.name));
       if (matchIndex !== -1) {
         const item = currentItems[matchIndex];
         const piecesPerUnit = item.piecesPerUnit || 1;
-        const qty = billItem.quantity || 1;
+        const qty = parseInt(billItem.quantity, 10) || 1;
         const totalPiecesDeducted = piecesPerUnit * qty;
-        const newStock = Math.max(0, (item.stockPieces || 0) - totalPiecesDeducted);
+        const before = parseInt(item.stockPieces, 10) || 0;
+        const newStock = Math.max(0, before - totalPiecesDeducted);
         item.stockPieces = newStock;
         hasChanges = true;
 
@@ -590,6 +798,19 @@ window.DataStore = {
           } catch (err) {
             console.warn('Could not update stock in Supabase:', err);
           }
+        }
+
+        if (before !== newStock) {
+          await this.recordStockMovement({
+            price_item_id: item.id,
+            item_name: item.name,
+            movement_type: 'sale',
+            quantity_delta: newStock - before,
+            quantity_before: before,
+            quantity_after: newStock,
+            note: context.customerName ? `Sold to ${context.customerName}` : 'Sold in customer bill',
+            reference_id: context.customerId || null
+          });
         }
       }
     }
@@ -826,7 +1047,7 @@ window.DataStore = {
 
       // Automatic Stock Deduction
       if (billItems && billItems.length > 0) {
-        await this.deductStock(billItems);
+        await this.deductStock(billItems, { customerId: tempId, customerName: newCustomer.name });
       }
 
       // Save to localStorage immediately without duplicates
@@ -931,6 +1152,8 @@ window.DataStore = {
     this._cache.priceItems = null;
     this._cache.priceItemsTime = 0;
     this._cache.customerItems.clear();
+    this._cache.stockMovements = null;
+    this._cache.stockMovementsTime = 0;
   }
 };
 

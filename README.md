@@ -8,7 +8,8 @@ A fast, lightweight, single-page SaaS web application designed for advocates and
 - **Customer List**: Compact, responsive grid showing customer name, date/time pill, phone number (or "No number added"), address, case/problem detail, bill items breakdown, and total.
 - **Billing & Price Section**: A searchable item picker above the price list finds catalog items by name, category, or packaging text and lists them in natural alphabetical/numerical order. Selecting an item auto-fills its catalog price, shows its packaging and stock, and lets you change quantity or customize the price without extra setup.
 - **Packaged Item Catalog**: Ships with the advocate counter-fee and notary packaging rules below. Prices are prefilled and editable; quantities are counted in sheets or 2-piece packs, while stock is tracked and deducted in pieces. Sheet/pack items with zero stock are blocked from selection, and the `+` button stops at available stock.
-- **Stock & Units**: Each bill row shows whether it is sold per sheet, per 2-piece pack, or per piece. Saved customer cards and WhatsApp summaries keep the same unit wording (for example `Notary (₹900 Base) × 1 sheet`). Editing an item from the three-dot menu also supports restocking through the **Stock (pieces)** field.
+- **Stock Management**: A dedicated **Stock** section (from the left menu) shows remaining stock for each item, highlights low/out-of-stock items, lets you add stock to existing items or create a new item with initial stock, supports quick edits, and keeps a stock movement history (additions, sales deductions, manual adjustments/sets).
+- **Stock & Units**: Each bill row shows whether it is sold per sheet, per 2-piece pack, or per piece. Saved customer cards and WhatsApp summaries keep the same unit wording (for example `Notary (₹900 Base) × 1 sheet`). Stock is tracked in pieces and deducted automatically when a customer bill is saved.
 - **Top 3-dot Options Drawer**: A visible three-dot button in the top-right header opens a slide-out panel containing the Items & Prices manager, Price List, and Cloud Sync settings. Every item row keeps its own 3-dot menu with **Edit item**, **Customize price**, **Price history**, and **Delete item**.
 - **Item Price History**: A dedicated history modal shows the current price, every recorded price change (old → new), and every past bill where the item was used.
 - **Draft Safety**: Typing in the New Customer form is never lost when navigating to Customers, Search, or Price List. A "Draft saved" bar allows instant continuation until explicitly closed with `✕`.
@@ -71,7 +72,7 @@ To enable cloud synchronization across multiple devices and deployments:
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. Open the **SQL Editor** in your Supabase dashboard.
-3. Copy and run the entire contents of `supabase/schema.sql`.
+3. Copy and run the entire contents of `supabase/schema.sql` (includes tables for customers, items, billing, and stock movement history).
 4. Copy your **Project URL** and **anon public key** from `Settings -> API`.
 5. Enter them either:
    - In `js/config.js` under `SUPABASE_URL` and `SUPABASE_ANON_KEY`, or
