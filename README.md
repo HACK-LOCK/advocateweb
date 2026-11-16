@@ -19,20 +19,6 @@ A fast, lightweight, single-page SaaS web application designed for advocates and
 
 ---
 
-## Packaged Item Catalog
-
-The default catalog is seeded on first run and upgraded automatically. Existing user-created items are preserved; same-name defaults keep their current price and stock while receiving the new packaging rules. All prices can be edited from the form, the Price List, or the drawer.
-
-| Item | Stock | Sales unit | Default price |
-| --- | --- | --- | --- |
-| Counter Fee (₹1 / 80 pieces) | 80 pcs | Full sheet only | ₹80 per sheet |
-| Counter Fee (₹2 / 160 pieces) | 160 pcs | Full sheet only | ₹160 per sheet |
-| Counter Fee (₹5 per piece) | Not tracked | Strictly per piece | ₹5 per piece |
-| Counter Fee (₹20 per piece) | Not tracked | Strictly per piece | ₹20 per piece |
-| Marriage Certificate / Stamp (2 pieces) | 128 pcs | 2-piece pack | ₹200 per 2 pcs |
-| Notary (₹450 Base) | 108 pcs | Sheet | ₹440 per sheet (₹450 base) |
-| Notary (₹900 Base) | 180 pcs | Sheet | ₹900 per sheet (optional, auto-filled) |
-
 Saving a bill deducts the matching pieces from stock: for example, one `Notary (₹900 Base)` sheet deducts 180 pieces, and one `Marriage Certificate / Stamp` pack deducts 2 pieces. Per-piece items without tracked stock remain unlimited.
 
 ---
