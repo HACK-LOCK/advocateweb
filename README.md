@@ -99,7 +99,7 @@ This project is ready to deploy on Render as a **Static Site** (no build step, n
 
 ### Supabase (optional, for cloud sync)
 The app works fully offline using browser `localStorage`. To enable multi-device sync:
-- Create a Supabase project and run `supabase/schema.sql` in the SQL Editor.
+- Create a Supabase project and run `supabase/schema.sql` in the SQL Editor (re-run it later to apply safe schema upgrades).
 - In the deployed app, open the menu (top-left) → **Cloud Sync (Supabase)** and enter your **Project URL** and **anon public key** (from Supabase → Settings → API).
 
 > **Note:** Do not commit real credentials. `.env` and Supabase local/link artifacts are gitignored; use `.env.example` as a template for local reference only.
