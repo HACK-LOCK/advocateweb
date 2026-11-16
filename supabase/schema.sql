@@ -62,6 +62,7 @@ alter table public.customer_items add column if not exists sales_unit text defau
 alter table public.customer_items add column if not exists pieces_per_unit integer default 1;
 alter table public.customer_items add column if not exists unit_description text;
 
+-- Stock history / movements log (safe to re-run)
 create table if not exists public.stock_movements (
   id uuid primary key default gen_random_uuid(),
   price_item_id uuid references public.price_items (id) on delete set null,
@@ -74,6 +75,16 @@ create table if not exists public.stock_movements (
   reference_id text,
   created_at timestamptz not null default now()
 );
+
+alter table public.stock_movements add column if not exists price_item_id uuid references public.price_items (id) on delete set null;
+alter table public.stock_movements add column if not exists item_name text;
+alter table public.stock_movements add column if not exists movement_type text;
+alter table public.stock_movements add column if not exists quantity_delta integer default 0;
+alter table public.stock_movements add column if not exists quantity_before integer default 0;
+alter table public.stock_movements add column if not exists quantity_after integer default 0;
+alter table public.stock_movements add column if not exists note text;
+alter table public.stock_movements add column if not exists reference_id text;
+alter table public.stock_movements add column if not exists created_at timestamptz default now();
 
 create index if not exists idx_customer_items_customer
   on public.customer_items (customer_id);
