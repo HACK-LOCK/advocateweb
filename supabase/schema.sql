@@ -42,7 +42,22 @@ create table if not exists public.customer_items (
   created_at timestamptz not null default now()
 );
 
--- Keep existing databases in sync with the packaged-unit columns
+-- Keep existing databases in sync (safe to re-run)
+alter table public.customers add column if not exists case_time time;
+alter table public.customers add column if not exists phone text;
+alter table public.customers add column if not exists address text;
+alter table public.customers add column if not exists problem text;
+alter table public.customers add column if not exists total numeric(10, 2) not null default 0;
+alter table public.customers add column if not exists updated_at timestamptz not null default now();
+
+alter table public.price_items add column if not exists category text;
+alter table public.price_items add column if not exists base_cost numeric(10, 2);
+alter table public.price_items add column if not exists sales_unit text default 'piece';
+alter table public.price_items add column if not exists pieces_per_unit integer default 1;
+alter table public.price_items add column if not exists stock_pieces integer default 0;
+alter table public.price_items add column if not exists unit_description text;
+alter table public.price_items add column if not exists is_active boolean not null default true;
+
 alter table public.customer_items add column if not exists sales_unit text default 'piece';
 alter table public.customer_items add column if not exists pieces_per_unit integer default 1;
 alter table public.customer_items add column if not exists unit_description text;
