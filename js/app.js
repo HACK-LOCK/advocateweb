@@ -113,6 +113,23 @@
   const stockSection = document.getElementById('stock-section') || document.getElementById('stock-modal');
   const btnBackStockModal = document.getElementById('btn-back-stock-modal');
   const btnCloseStockModal = document.getElementById('btn-close-stock-modal');
+
+  // Activity History Page (drawer)
+  const linkHistoryPage = document.getElementById('link-history-page');
+  const historySection = document.getElementById('history-section');
+  const btnBackHistoryPage = document.getElementById('btn-back-history-page');
+  const btnCloseHistoryPage = document.getElementById('btn-close-history-page');
+  const historyTabStockBtn = document.getElementById('history-tab-stock');
+  const historyTabCustomerBtn = document.getElementById('history-tab-customer');
+  const historyPanelStock = document.getElementById('history-panel-stock');
+  const historyPanelCustomer = document.getElementById('history-panel-customer');
+  const historyStockSearch = document.getElementById('history-stock-search');
+  const historyCustomerSearch = document.getElementById('history-customer-search');
+  const historyStockList = document.getElementById('history-stock-list');
+  const historyCustomerList = document.getElementById('history-customer-list');
+  let activityHistoryTab = 'stock'; // 'stock' | 'customer'
+  let historyStockSearchTerm = '';
+  let historyCustomerSearchTerm = '';
   const stockItemSelect = document.getElementById('stock-item-select');
   const stockNewNameGroup = document.getElementById('stock-new-name-group');
   const stockNewPriceGroup = document.getElementById('stock-new-price-group');
@@ -137,7 +154,7 @@
   // Application State
   let allPriceItems = [];
   let selectedItemsMap = new Map(); // price_item_id -> { item, quantity }
-  let currentTab = 'customers'; // 'new-customer', 'customers'
+  let currentTab = 'customers'; // 'new-customer', 'customers', 'stock', 'history'
   let hasPhoneReminderPrompted = false;
   let searchDebounceTimer = null;
   let isSaving = false;
@@ -179,6 +196,7 @@
     setupDrawer();
     setupModals();
     setupStockManagement();
+    setupActivityHistoryPage();
     setupItemEditModal();
     setupItemOptionsMenu();
     setupCloudSettings();
@@ -197,7 +215,8 @@
     if (navSearch) navSearch.classList.toggle('active', tab === 'search');
 
     if (stockSection) stockSection.style.display = tab === 'stock' ? 'block' : 'none';
-    if (customersSection) customersSection.style.display = (tab === 'stock' || tab === 'new-customer') ? 'none' : 'block';
+    if (historySection) historySection.style.display = tab === 'history' ? 'block' : 'none';
+    if (customersSection) customersSection.style.display = (tab === 'stock' || tab === 'history' || tab === 'new-customer') ? 'none' : 'block';
 
     if (tab === 'new-customer') {
       formContainer.style.display = 'block';
@@ -205,7 +224,7 @@
       draftBar.style.display = 'none';
       if (floatingBottomBar) floatingBottomBar.style.display = 'none';
       fieldName.focus();
-    } else if (tab === 'stock') {
+    } else if (tab === 'stock' || tab === 'history') {
       formContainer.style.display = 'none';
       if (searchSection) searchSection.style.display = 'none';
       draftBar.style.display = 'none';
@@ -303,6 +322,10 @@
       }
       if (stockHistoryModal && stockHistoryModal.style.display === 'flex') {
         stockHistoryModal.style.display = 'none';
+        return;
+      }
+      if (currentTab === 'history') {
+        setTab('customers');
         return;
       }
       if (currentTab === 'stock') {
@@ -1812,12 +1835,16 @@
       linkPriceList.addEventListener('click', onDrawerItemsClick);
     }
 
-    if (drawerBtnNewCustomer) {
-      drawerBtnNewCustomer.addEventListener('click', onDrawerNewCustomerClick);
-    }
-
     if (linkStockManager) {
       linkStockManager.addEventListener('click', onDrawerStockClick);
+    }
+
+    if (linkHistoryPage) {
+      linkHistoryPage.addEventListener('click', onDrawerHistoryClick);
+    }
+
+    if (drawerBtnNewCustomer) {
+      drawerBtnNewCustomer.addEventListener('click', onDrawerNewCustomerClick);
     }
   }
 
@@ -1830,7 +1857,7 @@
     if (itemEditModal) itemEditModal.style.display = 'none';
     if (stockHistoryModal) stockHistoryModal.style.display = 'none';
     if (cloudModal) cloudModal.style.display = 'none';
-    // stock page handled by setTab below
+    // stock/history pages handled by setTab below
 
     // Reset search if active
     if (searchInput && searchInput.value) {
@@ -1855,6 +1882,11 @@
   async function onDrawerStockClick() {
     closeDrawer();
     await openStockModal();
+  }
+
+  async function onDrawerHistoryClick() {
+    closeDrawer();
+    await openHistoryPage();
   }
 
   async function openItemsModal() {
@@ -2324,6 +2356,183 @@
 
   function closeStockHistoryModal() {
     if (stockHistoryModal) stockHistoryModal.style.display = 'none';
+  }
+
+  // Activity History Page (Stock movements + Customer history)
+  function formatCustomerHistoryEventLabel(eventType) {
+    const t = String(eventType || '').toLowerCase();
+    if (t === 'created') return 'Customer Added';
+    if (t === 'updated') return 'Customer Modified';
+    if (t === 'deleted') return 'Customer Deleted';
+    return 'Customer Activity';
+  }
+
+  function setHistoryTab(tab) {
+    activityHistoryTab = tab === 'customer' ? 'customer' : 'stock';
+    const isStock = activityHistoryTab === 'stock';
+    if (historyPanelStock) historyPanelStock.style.display = isStock ? 'block' : 'none';
+    if (historyPanelCustomer) historyPanelCustomer.style.display = isStock ? 'none' : 'block';
+    if (historyTabStockBtn) {
+      historyTabStockBtn.classList.toggle('active', isStock);
+      historyTabStockBtn.setAttribute('aria-selected', isStock ? 'true' : 'false');
+    }
+    if (historyTabCustomerBtn) {
+      historyTabCustomerBtn.classList.toggle('active', !isStock);
+      historyTabCustomerBtn.setAttribute('aria-selected', !isStock ? 'true' : 'false');
+    }
+  }
+
+  function renderHistoryStockList(movements) {
+    if (!historyStockList) return;
+    historyStockList.innerHTML = '';
+    const term = (historyStockSearchTerm || '').trim().toLowerCase();
+    const filtered = (movements || []).filter(m => {
+      if (!term) return true;
+      const hay = [
+        m.item_name || '',
+        m.movement_type || '',
+        m.note || '',
+        String(m.quantity_delta || ''),
+        String(m.quantity_before || ''),
+        String(m.quantity_after || '')
+      ].join(' ').toLowerCase();
+      return hay.includes(term);
+    });
+
+    if (filtered.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-items-notice';
+      empty.textContent = term ? 'No stock history matches your search.' : 'No stock movements recorded yet.';
+      historyStockList.appendChild(empty);
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    filtered.forEach(m => {
+      const delta = parseInt(m.quantity_delta, 10) || 0;
+      const deltaText = `${delta > 0 ? '+' : ''}${delta} pcs`;
+      const deltaClass = delta >= 0 ? 'pos' : 'neg';
+      const dateText = formatHistoryDate(m.created_at, true);
+      const row = document.createElement('div');
+      row.className = 'stock-history-item';
+      row.innerHTML = `
+        <div class="stock-history-top">
+          <div class="stock-history-type">${escapeHtml(formatStockMovementType(m.movement_type))} — ${escapeHtml(m.item_name || 'Item')}</div>
+          <div class="stock-history-delta ${deltaClass}">${escapeHtml(deltaText)}</div>
+        </div>
+        <div class="stock-history-meta">
+          <span>Before: ${parseInt(m.quantity_before, 10) || 0} pcs</span>
+          <span>After: ${parseInt(m.quantity_after, 10) || 0} pcs</span>
+          <span>${escapeHtml(dateText)}</span>
+          ${m.reference_id ? `<span>Ref: ${escapeHtml(String(m.reference_id))}</span>` : ''}
+        </div>
+        ${m.note ? `<div class="stock-history-note">${escapeHtml(m.note)}</div>` : ''}
+      `;
+      frag.appendChild(row);
+    });
+    historyStockList.appendChild(frag);
+  }
+
+  function renderHistoryCustomerList(entries) {
+    if (!historyCustomerList) return;
+    historyCustomerList.innerHTML = '';
+    const term = (historyCustomerSearchTerm || '').trim().toLowerCase();
+    const filtered = (entries || []).filter(entry => {
+      if (!term) return true;
+      const hay = [
+        entry.customer_name || '',
+        entry.event_type || '',
+        entry.details || '',
+        entry.changed_fields || ''
+      ].join(' ').toLowerCase();
+      return hay.includes(term);
+    });
+
+    if (filtered.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-items-notice';
+      empty.textContent = term ? 'No customer history matches your search.' : 'No customer history recorded yet.';
+      historyCustomerList.appendChild(empty);
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    filtered.forEach(entry => {
+      const dateText = formatHistoryDate(entry.created_at, true);
+      const label = formatCustomerHistoryEventLabel(entry.event_type);
+      const row = document.createElement('div');
+      row.className = 'stock-history-item';
+      row.innerHTML = `
+        <div class="stock-history-top">
+          <div class="stock-history-type">${escapeHtml(label)} — ${escapeHtml(entry.customer_name || 'Customer')}</div>
+          <div class="stock-history-delta pos">${escapeHtml(String(entry.event_type || 'info'))}</div>
+        </div>
+        <div class="stock-history-meta">
+          <span>${escapeHtml(dateText)}</span>
+          ${entry.changed_fields ? `<span>Changed: ${escapeHtml(entry.changed_fields)}</span>` : ''}
+          ${entry.customer_id ? `<span>Customer ID: ${escapeHtml(String(entry.customer_id))}</span>` : ''}
+        </div>
+        ${entry.details ? `<div class="stock-history-note">${escapeHtml(entry.details)}</div>` : ''}
+      `;
+      frag.appendChild(row);
+    });
+    historyCustomerList.appendChild(frag);
+  }
+
+  async function loadActivityHistory() {
+    if (historyStockList) historyStockList.innerHTML = '<div class="empty-items-notice">Loading stock history...</div>';
+    if (historyCustomerList) historyCustomerList.innerHTML = '<div class="empty-items-notice">Loading customer history...</div>';
+    try {
+      const [stockMovements, customerHistory] = await Promise.all([
+        window.DataStore.getStockMovements(null, 500),
+        window.DataStore.getCustomerHistory(500)
+      ]);
+      renderHistoryStockList(stockMovements || []);
+      renderHistoryCustomerList(customerHistory || []);
+    } catch (e) {
+      if (historyStockList) historyStockList.innerHTML = '<div class="empty-items-notice">Could not load stock history.</div>';
+      if (historyCustomerList) historyCustomerList.innerHTML = '<div class="empty-items-notice">Could not load customer history.</div>';
+    }
+  }
+
+  async function openHistoryPage() {
+    setTab('history');
+    setHistoryTab(activityHistoryTab || 'stock');
+    await loadActivityHistory();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function closeHistoryPage() {
+    if (currentTab === 'history') {
+      setTab('customers');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  function setupActivityHistoryPage() {
+    if (btnBackHistoryPage) btnBackHistoryPage.addEventListener('click', closeHistoryPage);
+    if (btnCloseHistoryPage) btnCloseHistoryPage.addEventListener('click', closeHistoryPage);
+
+    if (historyTabStockBtn) historyTabStockBtn.addEventListener('click', () => setHistoryTab('stock'));
+    if (historyTabCustomerBtn) historyTabCustomerBtn.addEventListener('click', () => setHistoryTab('customer'));
+
+    if (historyStockSearch) historyStockSearch.addEventListener('input', async () => {
+      historyStockSearchTerm = historyStockSearch.value || '';
+      try {
+        const movements = await window.DataStore.getStockMovements(null, 500);
+        renderHistoryStockList(movements || []);
+      } catch (e) {}
+    });
+
+    if (historyCustomerSearch) historyCustomerSearch.addEventListener('input', async () => {
+      historyCustomerSearchTerm = historyCustomerSearch.value || '';
+      try {
+        const entries = await window.DataStore.getCustomerHistory(500);
+        renderHistoryCustomerList(entries || []);
+      } catch (e) {}
+    });
+
+    setHistoryTab('stock');
   }
 
   function setupStockManagement() {

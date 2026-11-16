@@ -2044,6 +2044,29 @@ body.drawer-open {
 .stock-history-meta { font-size: 12px; color: #6b7280; display: flex; flex-wrap: wrap; gap: 8px 12px; }
 .stock-history-note { margin-top: 6px; font-size: 13px; color: #374151; white-space: pre-wrap; overflow-wrap: anywhere; }
 
+/* Activity History Page */
+.history-page-container { gap: 12px; }
+.history-page-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.history-tab-btn {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 999px;
+}
+.history-tab-btn.active {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border-color: var(--btn-bg);
+}
+.history-page-panel { display: block; }
+.history-page-list {
+  max-height: none;
+  overflow: visible;
+}
+
 @media (max-width: 900px) {
   .stock-page-container,
   #stock-history-modal .modal-content {

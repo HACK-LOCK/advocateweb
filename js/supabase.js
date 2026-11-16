@@ -184,12 +184,111 @@ window.DataStore = {
     customerItems: new Map(), // customerId -> { items, timestamp }
     stockMovements: null,
     stockMovementsTime: 0,
+    customerHistory: null,
+    customerHistoryTime: 0
   },
   CACHE_TTL_MS: 45000, // 45 seconds
 
   // Local price-change history (used by the item History modal)
   _priceHistoryKey: 'portal_price_history',
   _stockMovementsKey: 'portal_stock_movements',
+  _customerHistoryKey: 'portal_customer_history',
+
+  _getCustomerHistoryLocal() {
+    try {
+      const raw = window.localStorage.getItem(this._customerHistoryKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  _saveCustomerHistoryLocal(list) {
+    try {
+      window.localStorage.setItem(this._customerHistoryKey, JSON.stringify(list || []));
+    } catch (e) {
+      console.warn('Could not save customer history locally:', e);
+    }
+  },
+
+  async recordCustomerHistory(entry) {
+    const nowIso = entry.created_at || new Date().toISOString();
+    const localEntry = {
+      id: entry.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'ch_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)),
+      customer_id: (entry.customer_id && isValidUuid(String(entry.customer_id))) ? String(entry.customer_id) : (entry.customer_id || null),
+      customer_name: String(entry.customer_name || 'Customer').trim() || 'Customer',
+      event_type: String(entry.event_type || 'info').trim().toLowerCase(),
+      details: entry.details ? String(entry.details) : '',
+      changed_fields: entry.changed_fields ? String(entry.changed_fields) : '',
+      created_at: nowIso
+    };
+
+    const local = this._getCustomerHistoryLocal();
+    local.unshift(localEntry);
+    this._saveCustomerHistoryLocal(local.slice(0, 1500));
+    this._cache.customerHistory = null;
+    this._cache.customerHistoryTime = 0;
+
+    if (this.isSupabase()) {
+      try {
+        const payload = {
+          customer_id: (localEntry.customer_id && isValidUuid(String(localEntry.customer_id))) ? localEntry.customer_id : null,
+          customer_name: localEntry.customer_name,
+          event_type: localEntry.event_type,
+          details: localEntry.details || null,
+          changed_fields: localEntry.changed_fields || null,
+          created_at: localEntry.created_at
+        };
+        const res = await this._supabaseFetch('customer_history', {
+          method: 'POST',
+          headers: { 'Prefer': 'return=representation' },
+          body: JSON.stringify(payload)
+        });
+        if (res && res[0]) {
+          const saved = { ...localEntry, ...res[0], id: res[0].id || localEntry.id };
+          const idx = local.findIndex(h => String(h.id) === String(localEntry.id));
+          if (idx !== -1) local[idx] = saved; else local.unshift(saved);
+          this._saveCustomerHistoryLocal(local.slice(0, 1500));
+          return saved;
+        }
+      } catch (e) {
+        console.warn('Could not save customer history to Supabase:', e);
+      }
+    }
+    return localEntry;
+  },
+
+  async getCustomerHistory(limit = 300) {
+    const now = Date.now();
+    if (this.isSupabase()) {
+      try {
+        const path = `customer_history?select=*&order=created_at.desc&limit=${Math.max(1, Math.min(limit, 1000))}`;
+        const data = await this._supabaseFetch(path);
+        if (Array.isArray(data)) {
+          const normalized = data.map(h => ({
+            id: h.id,
+            customer_id: h.customer_id || null,
+            customer_name: h.customer_name || 'Customer',
+            event_type: h.event_type || 'info',
+            details: h.details || '',
+            changed_fields: h.changed_fields || '',
+            created_at: h.created_at
+          }));
+          this._cache.customerHistory = normalized;
+          this._cache.customerHistoryTime = now;
+          this._saveCustomerHistoryLocal(normalized);
+          return normalized.slice(0, limit);
+        }
+      } catch (e) {
+        console.warn('Supabase fetch failed for customer history, using local storage:', e);
+      }
+    }
+    const local = this._getCustomerHistoryLocal()
+      .slice()
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    return local.slice(0, limit);
+  },
 
   _getPriceHistoryLog() {
     try {
@@ -1052,9 +1151,17 @@ window.DataStore = {
 
       // Save to localStorage immediately without duplicates
       const existingIdx = localCustomers.findIndex(c => c.id === tempId);
-      if (existingIdx === -1) {
+      const isNewLocalInsert = existingIdx === -1;
+      if (isNewLocalInsert) {
         localCustomers.unshift(newCustomer);
         window.localStorage.setItem('portal_customers', JSON.stringify(localCustomers));
+        await this.recordCustomerHistory({
+          customer_id: newCustomer.id,
+          customer_name: newCustomer.name || 'Customer',
+          event_type: 'created',
+          details: `New customer added${newCustomer.problem ? ` (${newCustomer.problem})` : ''}`,
+          changed_fields: ''
+        });
       }
 
       // Cache update for immediate responsive UI
@@ -1154,6 +1261,8 @@ window.DataStore = {
     this._cache.customerItems.clear();
     this._cache.stockMovements = null;
     this._cache.stockMovementsTime = 0;
+    this._cache.customerHistory = null;
+    this._cache.customerHistoryTime = 0;
   }
 };
 
