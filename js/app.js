@@ -36,6 +36,36 @@
   const customItemPrice = document.getElementById('custom-item-price');
   const btnAddCustomItem = document.getElementById('btn-add-custom-item');
   const liveTotalEl = document.getElementById('live-total');
+  const btnBackForm = document.getElementById('btn-back-form');
+  const formTitle = document.getElementById('form-title');
+  const editingCustomerIdInput = document.getElementById('editing-customer-id');
+  const fieldPaidAmount = document.getElementById('field-paid-amount');
+  const btnPayFull = document.getElementById('btn-pay-full');
+  const btnPayZero = document.getElementById('btn-pay-zero');
+  const liveDueAmount = document.getElementById('live-due-amount');
+  const livePaymentStatus = document.getElementById('live-payment-status');
+
+  // Items modal add creator elements
+  const modalItemUnit = document.getElementById('modal-item-unit');
+  const modalItemPiecesPerUnit = document.getElementById('modal-item-pieces-per-unit');
+  const modalItemStockSheets = document.getElementById('modal-item-stock-sheets');
+  const modalItemStockPieces = document.getElementById('modal-item-stock-pieces');
+  const modalItemCalcHint = document.getElementById('modal-item-calc-hint');
+
+  // Item edit modal extra elements
+  const editItemUnit = document.getElementById('edit-item-unit');
+  const editItemPiecesPerUnit = document.getElementById('edit-item-pieces-per-unit');
+  const editItemStockSheets = document.getElementById('edit-item-stock-sheets');
+  const editItemCalcHint = document.getElementById('edit-item-calc-hint');
+
+  // Stock sheets sync
+  const stockSheetsInput = document.getElementById('stock-sheets-input');
+  const stockCalcHint = document.getElementById('stock-calc-hint');
+
+  // Bill modal edit action
+  const btnBillActionEdit = document.getElementById('btn-bill-action-edit');
+
+  let editingCustomerId = null;
   const btnSave = document.getElementById('btn-save');
   const btnCloseForm = document.getElementById('btn-close-form');
   const btnClosePrices = document.getElementById('btn-close-prices');
@@ -281,6 +311,13 @@
 
     if (btnContinueDraft) btnContinueDraft.addEventListener('click', onContinueDraftClick);
     if (btnDiscardDraft) btnDiscardDraft.addEventListener('click', discardDraft);
+
+    if (btnBackForm) {
+      btnBackForm.addEventListener('click', () => {
+        cancelCustomerEdit();
+        setTab('customers');
+      });
+    }
 
     if (btnCloseForm) {
       btnCloseForm.addEventListener('click', onCloseFormClick);
@@ -632,12 +669,36 @@
     });
 
     if (editItemStock) {
+      editItemStock.addEventListener('input', () => updateEditItemStockSync(false));
       editItemStock.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
           btnSaveItemEdit.click();
         }
       });
+    }
+
+    if (editItemStockSheets) {
+      editItemStockSheets.addEventListener('input', () => updateEditItemStockSync(true));
+    }
+
+    if (editItemUnit) {
+      editItemUnit.addEventListener('change', () => {
+        if (editItemPiecesPerUnit) {
+          if (editItemUnit.value === 'sheet' && (!editItemPiecesPerUnit.value || editItemPiecesPerUnit.value === '1')) {
+            editItemPiecesPerUnit.value = '80';
+          } else if (editItemUnit.value === 'piece') {
+            editItemPiecesPerUnit.value = '1';
+          } else if (editItemUnit.value === 'pair') {
+            editItemPiecesPerUnit.value = '2';
+          }
+        }
+        updateEditItemStockSync(false);
+      });
+    }
+
+    if (editItemPiecesPerUnit) {
+      editItemPiecesPerUnit.addEventListener('input', () => updateEditItemStockSync(false));
     }
   }
 
@@ -661,7 +722,12 @@
 
     btnSaveItemEdit.disabled = true;
     try {
-      const patch = { name, price };
+      const patch = {
+        name,
+        price,
+        sales_unit: editItemUnit ? editItemUnit.value : 'piece',
+        pieces_per_unit: editItemPiecesPerUnit ? (parseInt(editItemPiecesPerUnit.value, 10) || 1) : 1
+      };
       if (!isNaN(stockVal) && stockVal >= 0) {
         patch.stock_pieces = stockVal;
       }
@@ -673,7 +739,7 @@
 
         if (selectedItemsMap.has(id)) {
           const entry = selectedItemsMap.get(id);
-          entry.item = { ...updated, price: entry.item.price };
+          entry.item = { ...updated, price: updated.price };
         }
 
         updateLiveTotal();
@@ -694,6 +760,23 @@
     }
   }
 
+  function updateEditItemStockSync(fromSheets) {
+    const ppu = parseInt(editItemPiecesPerUnit ? editItemPiecesPerUnit.value : '1', 10) || 1;
+    if (fromSheets) {
+      const sheets = parseFloat(editItemStockSheets ? editItemStockSheets.value : '0') || 0;
+      if (editItemStock) editItemStock.value = Math.round(sheets * ppu);
+    } else {
+      const pcs = parseInt(editItemStock ? editItemStock.value : '0', 10) || 0;
+      if (editItemStockSheets) {
+        editItemStockSheets.value = (pcs / ppu).toFixed(2).replace(/\.00$/, '');
+      }
+    }
+    if (editItemCalcHint) {
+      const u = editItemUnit ? editItemUnit.value : 'sheet';
+      editItemCalcHint.textContent = `Conversion: 1 ${u} = ${ppu} pieces`;
+    }
+  }
+
   function openItemEditModal(item) {
     modalReturnDestination = (priceListModal && priceListModal.style.display === 'flex')
       ? 'items-modal'
@@ -704,12 +787,21 @@
     editItemPrice.value = item.price;
     itemEditModalTitle.textContent = `Edit Item: ${item.name}`;
 
-    if (editItemStock) {
-      editItemStock.value = item.stock_pieces !== undefined && item.stock_pieces !== null ? item.stock_pieces : 0;
+    const ppu = item.pieces_per_unit || (item.sales_unit === 'sheet' ? 80 : 1);
+    if (editItemUnit) editItemUnit.value = item.sales_unit || 'piece';
+    if (editItemPiecesPerUnit) editItemPiecesPerUnit.value = ppu;
+
+    const pcs = item.stock_pieces !== undefined && item.stock_pieces !== null ? item.stock_pieces : 0;
+    if (editItemStock) editItemStock.value = pcs;
+    if (editItemStockSheets) {
+      editItemStockSheets.value = (pcs / ppu).toFixed(2).replace(/\.00$/, '');
     }
 
     if (editItemPackagingHint) {
       editItemPackagingHint.textContent = getItemPackagingText(item);
+    }
+    if (editItemCalcHint) {
+      editItemCalcHint.textContent = `Conversion: 1 ${item.sales_unit || 'sheet'} = ${ppu} pieces`;
     }
 
     itemEditModal.style.display = 'flex';
@@ -1277,7 +1369,35 @@
       }
     });
 
+    liveTotalNumber = total;
     liveTotalEl.textContent = `₹${total.toFixed(2).replace(/\.00$/, '')}`;
+
+    // Calculate Cash Paid and Remaining Due
+    if (fieldPaidAmount) {
+      if (fieldPaidAmount.value === '' && !editingCustomerId) {
+        fieldPaidAmount.value = total > 0 ? total : '';
+      }
+      const paid = parseFloat(fieldPaidAmount.value) || 0;
+      const due = Math.max(0, total - paid);
+
+      if (liveDueAmount) {
+        liveDueAmount.textContent = `₹${due.toFixed(2).replace(/\.00$/, '')}`;
+      }
+
+      if (livePaymentStatus) {
+        livePaymentStatus.className = 'payment-status-badge';
+        if (due === 0 && total > 0) {
+          livePaymentStatus.classList.add('badge-paid');
+          livePaymentStatus.textContent = 'Paid';
+        } else if (paid > 0 && due > 0) {
+          livePaymentStatus.classList.add('badge-partial');
+          livePaymentStatus.textContent = 'Partial';
+        } else {
+          livePaymentStatus.classList.add('badge-due');
+          livePaymentStatus.textContent = 'Due';
+        }
+      }
+    }
   }
 
   async function handleAddCustomItem() {
@@ -1473,6 +1593,28 @@
 
     btnAddCustomItem.addEventListener('click', handleAddCustomItem);
 
+    if (btnPayFull) {
+      btnPayFull.addEventListener('click', () => {
+        if (fieldPaidAmount) {
+          fieldPaidAmount.value = liveTotalNumber;
+          updateLiveTotal();
+        }
+      });
+    }
+
+    if (btnPayZero) {
+      btnPayZero.addEventListener('click', () => {
+        if (fieldPaidAmount) {
+          fieldPaidAmount.value = '0';
+          updateLiveTotal();
+        }
+      });
+    }
+
+    if (fieldPaidAmount) {
+      fieldPaidAmount.addEventListener('input', updateLiveTotal);
+    }
+
     const customerForm = document.getElementById('customer-form');
     if (customerForm) {
       customerForm.addEventListener('submit', (e) => {
@@ -1572,16 +1714,26 @@
         });
       });
 
+      const paidAmt = fieldPaidAmount ? (parseFloat(fieldPaidAmount.value) || 0) : total;
       customerData.total = total;
+      customerData.paid_amount = paidAmt;
+      customerData.payment_status = (paidAmt >= total && total > 0) ? 'paid' : (paidAmt > 0 ? 'partial' : 'due');
 
-      const saved = await window.DataStore.saveCustomer(customerData, billItems);
+      let saved = null;
+      if (editingCustomerId) {
+        saved = await window.DataStore.updateCustomer(editingCustomerId, customerData, billItems);
+      } else {
+        saved = await window.DataStore.saveCustomer(customerData, billItems);
+      }
 
       if (saved) {
+        cancelCustomerEdit();
         window.localStorage.removeItem('portal_form_draft');
         fieldName.value = '';
         fieldPhone.value = '';
         fieldAddress.value = '';
         fieldProblem.value = '';
+        if (fieldPaidAmount) fieldPaidAmount.value = '';
         fieldDate.value = getTodayDateString();
         fieldTime.value = getCurrentTimeString();
         selectedItemsMap.clear();
@@ -1684,8 +1836,20 @@
       msg += `1. Legal Consultation : ₹0.00\n`;
     }
 
+    const totVal = parseFloat(customer.total) || 0;
+    const paidVal = parseFloat(customer.paid_amount !== undefined ? customer.paid_amount : totVal) || 0;
+    const dueVal = Math.max(0, totVal - paidVal);
+
     msg += `-------------------------------------------\n`;
-    msg += `*TOTAL AMOUNT: ₹${customer.total}*\n`;
+    msg += `*TOTAL AMOUNT: ₹${totVal.toFixed(2)}*\n`;
+    msg += `*CASH PAID / RECEIVED: ₹${paidVal.toFixed(2)}*\n`;
+    if (dueVal > 0) {
+      msg += `*REMAINING DUE / PENDING: ₹${dueVal.toFixed(2)}*\n`;
+      msg += `*PAYMENT STATUS: PENDING DUE*\n`;
+    } else {
+      msg += `*REMAINING DUE: ₹0.00 (PAID IN FULL)*\n`;
+      msg += `*PAYMENT STATUS: PAID*\n`;
+    }
     msg += `===========================================\n`;
     msg += `Advocate: Deepak S. Prajapati\n`;
     msg += `Talod, Dist: Sabarkantha - 383215\n`;
@@ -1815,7 +1979,14 @@
             </div>
             <div class="client-detail-row">
               <span class="cd-label">Status:</span>
-              <span class="cd-value cd-status-badge">Billed</span>
+              ${(() => {
+              const tot = parseFloat(customer.total) || 0;
+              const paid = parseFloat(customer.paid_amount !== undefined ? customer.paid_amount : tot) || 0;
+              const due = Math.max(0, tot - paid);
+              if (due === 0 && tot > 0) return '<span class="cd-value cd-status-badge badge-paid">PAID IN FULL</span>';
+              if (paid > 0 && due > 0) return `<span class="cd-value cd-status-badge badge-partial">DUE: ₹${due.toFixed(2)}</span>`;
+              return `<span class="cd-value cd-status-badge badge-due">PENDING DUE: ₹${due.toFixed(2)}</span>`;
+            })()}
             </div>
           </div>
           ${customer.problem ? `
@@ -1841,8 +2012,16 @@
             </tbody>
             <tfoot>
               <tr class="bill-grand-total-row">
-                <td colspan="3" class="total-caption">Total Amount Payable:</td>
-                <td class="total-figure">₹${parseFloat(customer.total || 0).toFixed(2)}</td>
+                <td colspan="3" class="total-caption">Total Amount:</td>
+                <td class="total-figure">₹${(parseFloat(customer.total) || 0).toFixed(2)}</td>
+              </tr>
+              <tr class="bill-sub-payment-row">
+                <td colspan="3" class="payment-sub-label">Cash Paid / Received:</td>
+                <td class="payment-sub-val">₹${(parseFloat(customer.paid_amount !== undefined ? customer.paid_amount : customer.total) || 0).toFixed(2)}</td>
+              </tr>
+              <tr class="bill-sub-payment-row ${Math.max(0, (parseFloat(customer.total) || 0) - (parseFloat(customer.paid_amount !== undefined ? customer.paid_amount : customer.total) || 0)) > 0 ? 'row-has-due' : 'row-cleared'}">
+                <td colspan="3" class="payment-sub-label">Remaining Balance / Due:</td>
+                <td class="payment-sub-val due-highlight">₹${Math.max(0, (parseFloat(customer.total) || 0) - (parseFloat(customer.paid_amount !== undefined ? customer.paid_amount : customer.total) || 0)).toFixed(2)}</td>
               </tr>
             </tfoot>
           </table>
@@ -1909,13 +2088,29 @@
         ${customer.address ? `<p class="card-address">${escapeHtml(customer.address)}</p>` : ''}
         ${customer.problem ? `<div class="card-problem">${escapeHtml(customer.problem)}</div>` : ''}
         
-        <div class="card-bill-box">
-          ${itemsHtml}
-          <div class="card-bill-total-row">
-            <span>Total</span>
-            <span>₹${customer.total}</span>
-          </div>
-        </div>
+        ${(() => {
+          const tot = parseFloat(customer.total) || 0;
+          const paid = parseFloat(customer.paid_amount !== undefined ? customer.paid_amount : tot) || 0;
+          const due = Math.max(0, tot - paid);
+          const badgeHtml = (due === 0 && tot > 0)
+            ? '<span class="badge-payment badge-paid">Paid</span>'
+            : (paid > 0 && due > 0)
+              ? `<span class="badge-payment badge-partial">Due: ₹${due}</span>`
+              : `<span class="badge-payment badge-due">Pending: ₹${due}</span>`;
+          return `
+            <div class="card-bill-box">
+              ${itemsHtml}
+              <div class="card-bill-total-row">
+                <span>Total</span>
+                <span>₹${tot}</span>
+              </div>
+              <div class="card-bill-payment-row">
+                <span class="payment-paid-text">Paid: ₹${paid}</span>
+                ${badgeHtml}
+              </div>
+            </div>
+          `;
+        })()}
       </div>
 
       <div class="card-actions">
@@ -1924,6 +2119,9 @@
             Call Client
           </a>
         ` : ''}
+        <button type="button" class="btn-card-action btn-edit-customer" aria-label="Edit bill and details for ${escapeHtml(customer.name)}">
+          Edit Bill
+        </button>
         <button type="button" class="btn-card-action btn-share-bill btn-whatsapp" aria-label="Share bill for ${escapeHtml(customer.name)}">
           Share Bill
         </button>
@@ -1940,6 +2138,15 @@
 
   // Delegated handler for customer card buttons
   function onCustomersGridClick(e) {
+    const editBtn = e.target.closest('.btn-edit-customer');
+    if (editBtn) {
+      const card = editBtn.closest('.customer-card');
+      if (card && card._customer) {
+        openCustomerForEdit(card._customer, card._items);
+      }
+      return;
+    }
+
     const shareBtn = e.target.closest('.btn-share-bill, .btn-whatsapp');
     if (!shareBtn) return;
 
@@ -1986,8 +2193,78 @@
     activeBillText = '';
   }
 
+
+  // Edit Existing Customer & Bill
+  function openCustomerForEdit(customer, items) {
+    if (!customer) return;
+
+    // Close any open modals
+    closeBillShareModal();
+    if (priceListModal) priceListModal.style.display = 'none';
+    if (itemEditModal) itemEditModal.style.display = 'none';
+
+    editingCustomerId = customer.id;
+    if (editingCustomerIdInput) editingCustomerIdInput.value = customer.id;
+
+    if (formTitle) formTitle.textContent = 'Edit Customer & Bill';
+    if (btnSave) btnSave.textContent = 'Update Customer & Bill';
+
+    fieldDate.value = customer.customer_date || getTodayDateString();
+    fieldTime.value = customer.case_time ? customer.case_time.slice(0, 5) : getCurrentTimeString();
+    fieldName.value = customer.name || '';
+    fieldPhone.value = customer.phone || '';
+    fieldAddress.value = customer.address || '';
+    fieldProblem.value = customer.problem || '';
+
+    const tot = parseFloat(customer.total) || 0;
+    const paid = parseFloat(customer.paid_amount !== undefined ? customer.paid_amount : tot) || 0;
+    if (fieldPaidAmount) {
+      fieldPaidAmount.value = paid;
+    }
+
+    // Populate selected items map with customer's items
+    selectedItemsMap.clear();
+    const custItems = items || customer.items || [];
+    custItems.forEach(it => {
+      const matched = allPriceItems.find(p => p.id === it.price_item_id || p.id === it.id);
+      const unitPrice = parseFloat(it.unit_price !== undefined ? it.unit_price : (matched ? matched.price : 0));
+      const itemObj = matched ? { ...matched, price: unitPrice } : {
+        id: it.price_item_id || it.id || ('custom_' + Date.now()),
+        name: it.item_name || it.name,
+        price: unitPrice,
+        sales_unit: it.sales_unit || 'piece',
+        pieces_per_unit: it.pieces_per_unit || 1,
+        stock_pieces: 0
+      };
+      selectedItemsMap.set(itemObj.id, {
+        item: itemObj,
+        quantity: parseInt(it.quantity, 10) || 1
+      });
+    });
+
+    renderPriceItemsInForm();
+    updateLiveTotal();
+
+    setTab('new-customer');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    fieldName.focus();
+  }
+
+  function cancelCustomerEdit() {
+    editingCustomerId = null;
+    if (editingCustomerIdInput) editingCustomerIdInput.value = '';
+    if (formTitle) formTitle.textContent = 'Create New Customer';
+    if (btnSave) btnSave.textContent = 'Save Customer';
+    clearForm();
+  }
   function setupBillShareModal() {
     if (btnBackBillModal) btnBackBillModal.addEventListener('click', closeBillShareModal);
+    if (btnBillActionEdit) {
+      btnBillActionEdit.addEventListener('click', () => {
+        if (!activeBillCustomer) return;
+        openCustomerForEdit(activeBillCustomer, activeBillItems);
+      });
+    }
     if (btnCloseBillModal) btnCloseBillModal.addEventListener('click', closeBillShareModal);
     if (billShareModal) {
       billShareModal.addEventListener('click', (e) => {
@@ -2251,6 +2528,29 @@
 
     if (btnModalAddItem) {
       btnModalAddItem.addEventListener('click', onModalAddItemClick);
+
+    if (modalItemUnit) {
+      modalItemUnit.addEventListener('change', () => {
+        if (modalItemPiecesPerUnit) {
+          if (modalItemUnit.value === 'sheet') modalItemPiecesPerUnit.value = '80';
+          else if (modalItemUnit.value === 'piece') modalItemPiecesPerUnit.value = '1';
+          else if (modalItemUnit.value === 'pair') modalItemPiecesPerUnit.value = '2';
+        }
+        updateModalItemStockSync(false);
+      });
+    }
+
+    if (modalItemPiecesPerUnit) {
+      modalItemPiecesPerUnit.addEventListener('input', () => updateModalItemStockSync(false));
+    }
+
+    if (modalItemStockSheets) {
+      modalItemStockSheets.addEventListener('input', () => updateModalItemStockSync(true));
+    }
+
+    if (modalItemStockPieces) {
+      modalItemStockPieces.addEventListener('input', () => updateModalItemStockSync(false));
+    }
     }
 
     if (modalItemName) {
@@ -2279,6 +2579,21 @@
     }
   }
 
+
+  function updateModalItemStockSync(fromSheets) {
+    const ppu = parseInt(modalItemPiecesPerUnit ? modalItemPiecesPerUnit.value : '1', 10) || 1;
+    if (fromSheets) {
+      const sheets = parseFloat(modalItemStockSheets ? modalItemStockSheets.value : '0') || 0;
+      if (modalItemStockPieces) modalItemStockPieces.value = Math.round(sheets * ppu);
+    } else {
+      const pcs = parseInt(modalItemStockPieces ? modalItemStockPieces.value : '0', 10) || 0;
+      if (modalItemStockSheets) modalItemStockSheets.value = (pcs / ppu).toFixed(2).replace(/\.00$/, '');
+    }
+    if (modalItemCalcHint) {
+      const u = modalItemUnit ? modalItemUnit.value : 'sheet';
+      modalItemCalcHint.textContent = `1 ${u} = ${ppu} pieces`;
+    }
+  }
   async function onModalAddItemClick() {
     const name = modalItemName.value.trim();
     const price = parseFloat(modalItemPrice.value);
@@ -2289,12 +2604,23 @@
     }
 
     btnModalAddItem.disabled = true;
+    const unit = modalItemUnit ? modalItemUnit.value : 'sheet';
+    const ppu = modalItemPiecesPerUnit ? (parseInt(modalItemPiecesPerUnit.value, 10) || 1) : 1;
+    const stockPcs = modalItemStockPieces ? (parseInt(modalItemStockPieces.value, 10) || 0) : 0;
+
     try {
-      const item = await window.DataStore.addPriceItem(name, price);
+      const item = await window.DataStore.addPriceItem(name, price, 'General', {
+        salesUnit: unit,
+        piecesPerUnit: ppu,
+        stockPieces: stockPcs,
+        unitDescription: `${unit} of ${ppu} pcs`
+      });
       if (item) {
         allPriceItems = await window.DataStore.getPriceItems();
         modalItemName.value = '';
         modalItemPrice.value = '';
+        if (modalItemStockSheets) modalItemStockSheets.value = '0';
+        if (modalItemStockPieces) modalItemStockPieces.value = '0';
         renderPriceListModalItems();
         renderPriceItemsInForm();
         updateDrawerCounts();
@@ -2593,6 +2919,28 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+
+  function updateStockAddSync(fromSheets) {
+    const selected = stockItemSelect ? stockItemSelect.value : '';
+    const item = allPriceItems.find(it => String(it.id) === selected);
+    const ppu = item ? (item.pieces_per_unit || (item.sales_unit === 'sheet' ? 80 : 1)) : 80;
+
+    if (fromSheets) {
+      const sheets = parseFloat(stockSheetsInput ? stockSheetsInput.value : '0') || 0;
+      if (stockQtyInput) stockQtyInput.value = Math.round(sheets * ppu);
+    } else {
+      const pcs = parseInt(stockQtyInput ? stockQtyInput.value : '0', 10) || 0;
+      if (stockSheetsInput) stockSheetsInput.value = (pcs / ppu).toFixed(2).replace(/\.00$/, '');
+    }
+
+    if (stockCalcHint) {
+      if (item) {
+        stockCalcHint.textContent = `1 ${item.sales_unit || 'sheet'} = ${ppu} pcs (Current stock: ${item.stock_pieces || 0} pcs)`;
+      } else {
+        stockCalcHint.textContent = 'Select an item to view sheet conversion';
+      }
+    }
+  }
   async function submitStockAdd() {
     if (!btnStockAddSubmit) return;
     const selected = stockItemSelect ? stockItemSelect.value : '';
@@ -2628,6 +2976,7 @@
       saveDraft();
 
       if (stockQtyInput) stockQtyInput.value = '';
+      if (stockSheetsInput) stockSheetsInput.value = '';
       if (stockNoteInput) stockNoteInput.value = '';
       if (selected === '__new__') {
         if (stockNewName) stockNewName.value = '';
@@ -2880,7 +3229,20 @@
     if (btnCloseStockModal) btnCloseStockModal.addEventListener('click', closeStockModal);
     if (btnStockAddSubmit) btnStockAddSubmit.addEventListener('click', submitStockAdd);
     if (btnStockRefresh) btnStockRefresh.addEventListener('click', openStockModal);
-    if (stockItemSelect) stockItemSelect.addEventListener('change', toggleStockNewItemFields);
+    if (stockItemSelect) {
+      stockItemSelect.addEventListener('change', () => {
+        toggleStockNewItemFields();
+        updateStockAddSync(false);
+      });
+    }
+
+    if (stockSheetsInput) {
+      stockSheetsInput.addEventListener('input', () => updateStockAddSync(true));
+    }
+
+    if (stockQtyInput) {
+      stockQtyInput.addEventListener('input', () => updateStockAddSync(false));
+    }
     if (stockSearchInput) stockSearchInput.addEventListener('input', () => { stockSearchTerm = stockSearchInput.value || ''; renderStockItemsList(); });
     if (stockQtyInput) stockQtyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitStockAdd(); } });
 

@@ -955,8 +955,13 @@ window.DataStore = {
               timestamp: now
             });
 
+            const paidAmt = parseFloat(c.paid_amount != null ? c.paid_amount : 0);
+            const totalAmt = parseFloat(c.total || 0);
+            const payStatus = c.payment_status || (paidAmt >= totalAmt && totalAmt > 0 ? 'paid' : (paidAmt > 0 ? 'partial' : 'due'));
             return {
               ...c,
+              paid_amount: paidAmt,
+              payment_status: payStatus,
               items
             };
           });
@@ -1130,6 +1135,10 @@ window.DataStore = {
         unit_description: it.unit_description || ''
       }));
 
+      const paidAmount = parseFloat(customerData.paid_amount != null ? customerData.paid_amount : 0);
+      const totalAmount = parseFloat(customerData.total) || 0;
+      const paymentStatus = customerData.payment_status || (paidAmount >= totalAmount && totalAmount > 0 ? 'paid' : (paidAmount > 0 ? 'partial' : 'due'));
+
       const newCustomer = {
         id: tempId,
         customer_date: customerData.customer_date,
@@ -1138,7 +1147,9 @@ window.DataStore = {
         phone: (customerData.phone || '').trim() || null,
         address: (customerData.address || '').trim() || null,
         problem: (customerData.problem || '').trim() || null,
-        total: parseFloat(customerData.total) || 0,
+        total: totalAmount,
+        paid_amount: paidAmount,
+        payment_status: paymentStatus,
         created_at: nowIso,
         updated_at: nowIso,
         items: formattedItems
@@ -1181,7 +1192,9 @@ window.DataStore = {
             phone: newCustomer.phone,
             address: newCustomer.address,
             problem: newCustomer.problem,
-            total: newCustomer.total
+            total: newCustomer.total,
+            paid_amount: newCustomer.paid_amount,
+            payment_status: newCustomer.payment_status
           };
 
           const custRes = await this._supabaseFetch('customers', {
@@ -1249,6 +1262,127 @@ window.DataStore = {
       return newCustomer;
     } finally {
       this._isSavingCustomer = false;
+    }
+  },
+
+  async updateCustomer(customerId, customerData, billItems) {
+    try {
+      const localCustomers = JSON.parse(window.localStorage.getItem('portal_customers') || '[]');
+      const nowIso = new Date().toISOString();
+      const paidAmount = parseFloat(customerData.paid_amount != null ? customerData.paid_amount : 0);
+      const totalAmount = parseFloat(customerData.total) || 0;
+      const paymentStatus = customerData.payment_status || (paidAmount >= totalAmount && totalAmount > 0 ? 'paid' : (paidAmount > 0 ? 'partial' : 'due'));
+
+      const formattedItems = (billItems || []).map(it => ({
+        id: it.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'it_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)),
+        item_name: it.item_name || it.name,
+        quantity: parseInt(it.quantity, 10) || 1,
+        unit_price: parseFloat(it.unit_price || it.price || 0),
+        line_total: parseFloat(it.line_total || ((it.unit_price || it.price || 0) * (it.quantity || 1))),
+        price_item_id: it.price_item_id || it.id || null,
+        sales_unit: it.sales_unit || null,
+        pieces_per_unit: parseInt(it.pieces_per_unit, 10) || 1,
+        unit_description: it.unit_description || ''
+      }));
+
+      const existingIdx = localCustomers.findIndex(c => String(c.id) === String(customerId));
+      const oldCust = existingIdx !== -1 ? localCustomers[existingIdx] : null;
+
+      const updatedCustomer = {
+        id: customerId,
+        customer_date: customerData.customer_date || (oldCust && oldCust.customer_date) || new Date().toISOString().slice(0, 10),
+        case_time: customerData.case_time || (oldCust && oldCust.case_time) || null,
+        name: (customerData.name || (oldCust && oldCust.name) || '').trim(),
+        phone: (customerData.phone || (oldCust && oldCust.phone) || '').trim() || null,
+        address: (customerData.address || (oldCust && oldCust.address) || '').trim() || null,
+        problem: (customerData.problem || (oldCust && oldCust.problem) || '').trim() || null,
+        total: totalAmount,
+        paid_amount: paidAmount,
+        payment_status: paymentStatus,
+        created_at: (oldCust && oldCust.created_at) || nowIso,
+        updated_at: nowIso,
+        items: formattedItems
+      };
+
+      if (existingIdx !== -1) {
+        localCustomers[existingIdx] = updatedCustomer;
+      } else {
+        localCustomers.unshift(updatedCustomer);
+      }
+      window.localStorage.setItem('portal_customers', JSON.stringify(localCustomers));
+
+      this._cache.customers = localCustomers;
+      this._cache.customersTime = Date.now();
+      this._cache.customerItems.set(customerId, {
+        items: formattedItems,
+        timestamp: Date.now()
+      });
+
+      await this.recordCustomerHistory({
+        customer_id: customerId,
+        customer_name: updatedCustomer.name || 'Customer',
+        event_type: 'updated',
+        details: `Customer bill updated (Total: ₹${totalAmount}, Paid: ₹${paidAmount}, Status: ${paymentStatus})`,
+        changed_fields: 'items, total, paid_amount, payment_status'
+      });
+
+      if (this.isSupabase() && isValidUuid(String(customerId))) {
+        try {
+          const updatePayload = {
+            customer_date: updatedCustomer.customer_date,
+            case_time: updatedCustomer.case_time,
+            name: updatedCustomer.name,
+            phone: updatedCustomer.phone,
+            address: updatedCustomer.address,
+            problem: updatedCustomer.problem,
+            total: updatedCustomer.total,
+            paid_amount: updatedCustomer.paid_amount,
+            payment_status: updatedCustomer.payment_status,
+            updated_at: nowIso
+          };
+
+          await this._supabaseFetch(`customers?id=eq.${customerId}`, {
+            method: 'PATCH',
+            headers: { 'Prefer': 'return=minimal' },
+            body: JSON.stringify(updatePayload)
+          });
+
+          await this._supabaseFetch(`customer_items?customer_id=eq.${customerId}`, {
+            method: 'DELETE',
+            headers: { 'Prefer': 'return=minimal' }
+          });
+
+          if (formattedItems.length > 0) {
+            const itemsPayload = formattedItems.map(it => {
+              const pid = it.price_item_id || it.id;
+              return {
+                customer_id: customerId,
+                price_item_id: isValidUuid(pid) ? pid : null,
+                item_name: it.item_name || it.name,
+                quantity: parseInt(it.quantity, 10) || 1,
+                unit_price: parseFloat(it.unit_price || it.price || 0),
+                line_total: parseFloat(it.line_total || ((it.unit_price || it.price || 0) * (it.quantity || 1))),
+                sales_unit: it.sales_unit || 'piece',
+                pieces_per_unit: parseInt(it.pieces_per_unit, 10) || 1,
+                unit_description: it.unit_description || ''
+              };
+            });
+
+            await this._supabaseFetch('customer_items', {
+              method: 'POST',
+              headers: { 'Prefer': 'return=minimal' },
+              body: JSON.stringify(itemsPayload)
+            });
+          }
+        } catch (supErr) {
+          console.warn('Supabase updateCustomer sync failed, local data is preserved:', supErr);
+        }
+      }
+
+      return updatedCustomer;
+    } catch (err) {
+      console.error('Error in updateCustomer:', err);
+      throw err;
     }
   },
 

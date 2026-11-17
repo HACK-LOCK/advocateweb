@@ -10,6 +10,8 @@ create table if not exists public.customers (
   address text,
   problem text,
   total numeric(10, 2) not null default 0,
+  paid_amount numeric(10, 2) not null default 0,
+  payment_status text not null default 'due',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -48,6 +50,8 @@ alter table public.customers add column if not exists phone text;
 alter table public.customers add column if not exists address text;
 alter table public.customers add column if not exists problem text;
 alter table public.customers add column if not exists total numeric(10, 2) not null default 0;
+alter table public.customers add column if not exists paid_amount numeric(10, 2) not null default 0;
+alter table public.customers add column if not exists payment_status text not null default 'due';
 alter table public.customers add column if not exists updated_at timestamptz not null default now();
 
 alter table public.price_items add column if not exists category text;
@@ -166,6 +170,6 @@ values
   ('10000000-0000-4000-8000-000000000003', 'Counter Fee (₹5 per piece)', 'Counter Fee', 5, 5, 'piece', 1, 0, 'Sold strictly per single piece · ₹5 per piece · no sheet unit', true),
   ('10000000-0000-4000-8000-000000000004', 'Counter Fee (₹20 per piece)', 'Counter Fee', 20, 20, 'piece', 1, 0, 'Sold strictly per single piece · ₹20 per piece · no sheet unit', true),
   ('10000000-0000-4000-8000-000000000005', 'Marriage Certificate / Stamp (2 pieces)', 'Marriage', 200, 0, 'pair', 2, 128, 'Sold per 2-pc unit · ₹200 for 2 pieces · price editable', true),
-  ('10000000-0000-4000-8000-000000000006', 'Notary (₹450 Base)', 'Notary', 440, 450, 'sheet', 108, 108, '1 sheet = 108 pcs · ₹450 base · sold at ₹440 per sheet', true),
+  ('10000000-0000-4000-8000-000000000006', 'Notary (₹540 Base)', 'Notary', 440, 450, 'sheet', 108, 108, '1 sheet = 108 pcs · ₹450 base · sold at ₹440 per sheet', true),
   ('10000000-0000-4000-8000-000000000007', 'Notary (₹900 Base)', 'Notary', 900, 900, 'sheet', 180, 180, '1 sheet = 180 pcs · ₹900 per sheet · auto price, editable', true)
 on conflict (id) do nothing;
