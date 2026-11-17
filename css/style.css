@@ -3020,3 +3020,199 @@ body.drawer-open {
   gap: 8px;
   align-items: center;
 }
+
+
+/* Modern Card Header Bar (single top edit button) */
+.card-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 2px;
+}
+
+.btn-card-top-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.btn-card-top-edit:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-dark);
+  color: #000000;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Card Bill Breakdown (clean & quiet) */
+.card-bill-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-bill-payment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  margin-top: 4px;
+  font-size: 12px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.payment-paid-text {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.payment-settled-text {
+  color: #166534;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.payment-due-highlight {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b91c1c;
+  letter-spacing: 0.3px;
+}
+
+/* Card Bottom Actions Grid */
+.card-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+  margin-top: auto;
+}
+
+.btn-card-action {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  background: #ffffff;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.btn-card-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.btn-card-action.btn-call {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: var(--border-color);
+}
+
+.btn-card-action.btn-call:hover {
+  background: #f8fafc;
+  border-color: var(--border-dark);
+}
+
+.btn-card-action.btn-whatsapp {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+.btn-card-action.btn-whatsapp:hover {
+  background: #1e293b;
+  border-color: #1e293b;
+}
+
+/* Bottom Payment Status Button */
+.btn-payment-action {
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.btn-payment-action.status-btn-paid {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.btn-payment-action.status-btn-paid:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.btn-payment-action.status-btn-partial {
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.btn-payment-action.status-btn-partial:hover {
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+.btn-payment-action.status-btn-due {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.btn-payment-action.status-btn-due:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.btn-payment-action .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.btn-payment-action .status-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-payment-action .status-arrow {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-left: 1px;
+}

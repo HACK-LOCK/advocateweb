@@ -2138,8 +2138,9 @@
     const due = Math.max(0, tot - paid);
     const isPaid = (due === 0 && tot > 0);
     const isPartial = (paid > 0 && due > 0);
-    const badgeClass = isPaid ? 'badge-paid' : (isPartial ? 'badge-partial' : 'badge-due');
-    const badgeLabel = isPaid ? 'Paid' : (isPartial ? `Due: ₹${due}` : `Pending: ₹${due}`);
+
+    const statusBtnClass = isPaid ? 'status-btn-paid' : (isPartial ? 'status-btn-partial' : 'status-btn-due');
+    const statusBtnLabel = isPaid ? 'Paid' : (isPartial ? `Due: ₹${due}` : `Pending: ₹${due}`);
 
     card.innerHTML = `
       <div class="card-top">
@@ -2148,7 +2149,7 @@
             <span class="card-datetime-item">${escapeHtml(dateFormatted)}</span>
             ${timeFormatted ? `<span class="card-datetime-item">${escapeHtml(timeFormatted.trim())}</span>` : ''}
           </div>
-          <button type="button" class="btn-card-top-edit btn-edit-customer" aria-label="Edit bill for ${escapeHtml(customer.name)}" title="Edit Bill & Details">
+          <button type="button" class="btn-card-top-edit btn-edit-customer" aria-label="Edit customer & bill for ${escapeHtml(customer.name)}" title="Edit Details & Bill">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -2163,28 +2164,14 @@
         ${customer.problem ? `<div class="card-problem">${escapeHtml(customer.problem)}</div>` : ''}
         
         <div class="card-bill-box">
-          <div class="card-bill-top-bar">
-            <span class="card-bill-label">Bill Breakdown</span>
-            <button type="button" class="btn-card-bill-pencil btn-edit-customer" title="Edit this bill">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-              <span>Edit Bill</span>
-            </button>
-          </div>
           ${itemsHtml}
           <div class="card-bill-total-row">
             <span>Total</span>
             <span>₹${tot}</span>
           </div>
           <div class="card-bill-payment-row">
-            <div class="card-payment-amounts">
-              <span class="payment-paid-text">Collected: ₹${paid}</span>
-              ${due > 0 ? `<span class="payment-due-highlight">Pending: ₹${due}</span>` : ''}
-            </div>
-            <button type="button" class="btn-payment-quick-toggle ${badgeClass}" data-customer-id="${customer.id}" title="Click to change payment status (Paid / Pending)">
-              <span class="status-dot"></span>
-              <span class="status-label">${badgeLabel}</span>
-              <span class="status-arrow">▾</span>
-            </button>
+            <span class="payment-paid-text">Paid: ₹${paid}</span>
+            ${due > 0 ? `<span class="payment-due-highlight">Due: ₹${due}</span>` : `<span class="payment-settled-text">Settled</span>`}
           </div>
         </div>
       </div>
@@ -2198,18 +2185,16 @@
             <span>Call</span>
           </a>
         ` : ''}
-        <button type="button" class="btn-card-action btn-edit-customer" aria-label="Edit bill and details for ${escapeHtml(customer.name)}" title="Edit Bill">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-          </svg>
-          <span>Edit Bill</span>
+        <button type="button" class="btn-card-action btn-payment-action ${statusBtnClass}" data-customer-id="${customer.id}" aria-label="Update Payment Status" title="Click to update payment">
+          <span class="status-dot"></span>
+          <span class="status-text">${statusBtnLabel}</span>
+          <span class="status-arrow">▾</span>
         </button>
         <button type="button" class="btn-card-action btn-share-bill btn-whatsapp" aria-label="Share bill for ${escapeHtml(customer.name)}" title="Share on WhatsApp">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
           </svg>
-          <span>Share Bill</span>
+          <span>WhatsApp</span>
         </button>
       </div>
     `;
@@ -2224,9 +2209,9 @@
 
   // Delegated handler for customer card buttons
   function onCustomersGridClick(e) {
-    const payToggle = e.target.closest('.btn-payment-quick-toggle');
-    if (payToggle) {
-      const card = payToggle.closest('.customer-card');
+    const payBtn = e.target.closest('.btn-payment-action, .btn-payment-quick-toggle');
+    if (payBtn) {
+      const card = payBtn.closest('.customer-card');
       if (card && card._customer) {
         openQuickPaymentModal(card._customer);
       }
