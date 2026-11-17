@@ -49,6 +49,19 @@ const server = http.createServer((req, res) => {
     return send(res, 400, 'Bad request', { 'Content-Type': 'text/plain; charset=utf-8' });
   }
 
+  // Deployment-level Supabase settings for the browser app.
+  // Only public (anon) credentials are exposed here - never a service_role key.
+  if (pathname === '/api/config') {
+    const config = {
+      SUPABASE_URL: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL || '',
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY || ''
+    };
+    return send(res, 200, JSON.stringify(config), {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store'
+    });
+  }
+
   if (pathname === '/' || pathname === '/index.html') {
     pathname = '/index.html';
   }

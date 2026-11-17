@@ -1539,7 +1539,7 @@
 
       customerData.total = total;
 
-      const saved = await window.DataStore.createCustomer(customerData, billItems);
+      const saved = await window.DataStore.saveCustomer(customerData, billItems);
 
       if (saved) {
         window.localStorage.removeItem('portal_form_draft');
@@ -2129,6 +2129,19 @@
         cloudModal.style.display = 'none';
       });
     }
+
+    // Refresh the UI when deployment credentials arrive from /api/config.
+    window.addEventListener('portal:config-updated', async () => {
+      updateCloudModalIndicator();
+      if (window.DataStore && window.DataStore.isSupabase()) {
+        try {
+          await loadAndRenderCustomers();
+        } catch (e) {
+          console.warn('Could not refresh customers after config update:', e);
+        }
+      }
+    });
+    updateCloudModalIndicator();
   }
 
   function updateCloudModalIndicator() {
