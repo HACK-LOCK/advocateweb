@@ -1,0 +1,9 @@
+{
+  "name": "advocateweb",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Customer management portal for advocates and lawyers",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
