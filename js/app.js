@@ -376,7 +376,10 @@
   }
 
   // Single-reference navigation handlers
-  function onNavNewCustomerClick() { setTab('new-customer'); }
+  function onNavNewCustomerClick() {
+    if (editingCustomerId) { cancelCustomerEdit(); }
+    setTab('new-customer');
+  }
   function onNavCustomersClick() { setTab('customers'); }
   function onNavSearchClick() {
     if (searchInput) {
@@ -2437,7 +2440,19 @@
     if (editingCustomerIdInput) editingCustomerIdInput.value = '';
     if (formTitle) formTitle.textContent = 'Create New Customer';
     if (btnSave) btnSave.textContent = 'Save Customer';
-    clearForm();
+    // Clear form fields without touching visibility (setTab handles that)
+    window.localStorage.removeItem('portal_form_draft');
+    fieldName.value = '';
+    fieldPhone.value = '';
+    fieldAddress.value = '';
+    fieldProblem.value = '';
+    fieldDate.value = getTodayDateString();
+    fieldTime.value = getCurrentTimeString();
+    if (fieldPaidAmount) fieldPaidAmount.value = '';
+    selectedItemsMap.clear();
+    renderPriceItemsInForm();
+    updateLiveTotal();
+    if (draftBar) draftBar.style.display = 'none';
   }
   function setupBillShareModal() {
     if (btnBackBillModal) btnBackBillModal.addEventListener('click', closeBillShareModal);
