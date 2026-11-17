@@ -73,8 +73,12 @@
     <!-- Create New Customer Form -->
     <section id="form-container" class="form-panel" style="display: none;">
       <div class="form-header">
-        <div class="form-title-group">
-          <h2 class="form-title">Create New Customer</h2>
+        <div class="form-title-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <button type="button" id="btn-back-form" class="btn-modal-back" title="Back to customer list" aria-label="Back">
+            <span class="btn-back-arrow">←</span>
+            <span>Back</span>
+          </button>
+          <h2 class="form-title" id="form-title">Create New Customer</h2>
           <!-- Compact Date + Time Pill with clean SVG icons -->
           <div class="datetime-pill" id="datetime-pill">
             <span class="pill-icon" aria-hidden="true">
@@ -99,6 +103,7 @@
       </div>
 
       <form id="customer-form" autocomplete="off" onsubmit="return false;">
+        <input type="hidden" id="editing-customer-id">
         <div class="form-grid">
           <div class="field-group">
             <label for="field-name" class="field-label">Name *</label>
@@ -165,6 +170,28 @@
             <div class="live-pricing-bar">
               <span class="live-pricing-label">Total Amount</span>
               <span class="live-pricing-total" id="live-total">₹0</span>
+            </div>
+
+            <!-- Cash Paid & Remaining Due Tracking -->
+            <div class="payment-tracking-box">
+              <div class="payment-tracking-row">
+                <div class="payment-tracking-input-group">
+                  <label for="field-paid-amount" class="payment-field-label">Cash Received / Paid Amount (₹)</label>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="field-paid-amount" class="field-input field-paid-input" min="0" step="any" placeholder="0">
+                  </div>
+                </div>
+                <div class="payment-quick-actions">
+                  <button type="button" id="btn-pay-full" class="btn-quick-pay" title="Set paid amount equal to total">Full Paid</button>
+                  <button type="button" id="btn-pay-zero" class="btn-quick-pay" title="Set paid amount to 0 (Unpaid)">Due (₹0)</button>
+                </div>
+              </div>
+              <div class="payment-due-summary">
+                <span class="payment-due-label">Remaining Balance Due:</span>
+                <span class="payment-due-value" id="live-due-amount">₹0</span>
+                <span class="payment-status-badge badge-due" id="live-payment-status">Due</span>
+              </div>
             </div>
           </div>
 
@@ -333,10 +360,23 @@
         <button type="button" id="btn-close-price-modal" class="btn-close-x" aria-label="Close Items Modal" title="Close">✕</button>
       </div>
 
-      <div class="add-custom-item-box" style="margin-bottom: 14px;">
-        <input type="text" id="modal-item-name" class="add-custom-input" placeholder="Item name (e.g. Affidavit, Notary, Consultation)">
-        <input type="number" id="modal-item-price" class="add-custom-input" placeholder="Price (₹)" min="0" step="any">
-        <button type="button" id="btn-modal-add-item" class="btn-add-item">+ Add Item</button>
+      <div class="add-custom-item-box add-item-creator-panel" style="margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <input type="text" id="modal-item-name" class="add-custom-input" style="flex: 2 1 180px;" placeholder="Item name (e.g. Affidavit, Notary, Stamp)">
+          <input type="number" id="modal-item-price" class="add-custom-input" style="flex: 1 1 100px;" placeholder="Price (₹)" min="0" step="any">
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+          <select id="modal-item-unit" class="field-input" style="flex: 1 1 110px; height: 38px;">
+            <option value="sheet" selected>Sheet (80 pcs)</option>
+            <option value="piece">Piece (Single)</option>
+            <option value="pair">Pair (2 pcs)</option>
+          </select>
+          <input type="number" id="modal-item-pieces-per-unit" class="field-input" style="flex: 1 1 90px; height: 38px;" min="1" step="1" value="80" title="Pieces per unit / sheet" placeholder="Pcs/Sheet">
+          <input type="number" id="modal-item-stock-sheets" class="field-input" style="flex: 1 1 100px; height: 38px;" min="0" step="any" placeholder="Initial Sheets" title="Initial Sheets">
+          <input type="number" id="modal-item-stock-pieces" class="field-input" style="flex: 1 1 100px; height: 38px;" min="0" step="1" placeholder="Initial Pieces" title="Initial Pieces">
+          <button type="button" id="btn-modal-add-item" class="btn-add-item" style="flex: 1 1 110px; height: 38px;">+ Add Item</button>
+        </div>
+        <div class="field-hint" id="modal-item-calc-hint" style="font-size: 11px; margin-top: -3px;">1 sheet = 80 pieces. Enter either sheets or pieces to auto-calculate.</div>
       </div>
 
       <div id="modal-price-items" class="modal-scroll-list">
@@ -401,9 +441,18 @@
             <label for="stock-new-price" class="field-label">New item price (₹)</label>
             <input type="number" id="stock-new-price" class="field-input" min="0" step="any" placeholder="0">
           </div>
-          <div class="field-group">
-            <label for="stock-qty-input" class="field-label">Stock to add (pieces)</label>
-            <input type="number" id="stock-qty-input" class="field-input" min="1" step="1" placeholder="e.g. 10">
+          <div class="field-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div>
+              <label for="stock-sheets-input" class="field-label">Sheets to add</label>
+              <input type="number" id="stock-sheets-input" class="field-input" min="0" step="any" placeholder="e.g. 1">
+            </div>
+            <div>
+              <label for="stock-qty-input" class="field-label">Total Pieces</label>
+              <input type="number" id="stock-qty-input" class="field-input" min="1" step="1" placeholder="e.g. 80">
+            </div>
+          </div>
+          <div class="field-hint" id="stock-calc-hint" style="grid-column: 1 / -1; font-size: 12px; margin-top: -4px;">
+            Select an item to view sheet conversion.
           </div>
           <div class="field-group stock-note-group">
             <label for="stock-note-input" class="field-label">Note (optional)</label>
@@ -517,11 +566,31 @@
           <input type="number" id="edit-item-price" class="field-input" min="0" step="any" placeholder="0">
           <span class="field-hint" id="edit-item-price-hint">Updates the price for this item and future selections</span>
         </div>
-        <div class="field-group">
-          <label for="edit-item-stock" class="field-label">Stock (pieces)</label>
-          <input type="number" id="edit-item-stock" class="field-input" min="0" step="1" placeholder="0">
-          <span class="field-hint">Leave as-is if you do not track stock.</span>
+        <div class="field-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label for="edit-item-unit" class="field-label">Unit Type</label>
+            <select id="edit-item-unit" class="field-input">
+              <option value="sheet">Sheet</option>
+              <option value="piece">Piece</option>
+              <option value="pair">Pair</option>
+            </select>
+          </div>
+          <div>
+            <label for="edit-item-pieces-per-unit" class="field-label">Pieces Per Unit</label>
+            <input type="number" id="edit-item-pieces-per-unit" class="field-input" min="1" step="1" value="1">
+          </div>
         </div>
+        <div class="field-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label for="edit-item-stock-sheets" class="field-label">Stock (Sheets)</label>
+            <input type="number" id="edit-item-stock-sheets" class="field-input" min="0" step="any" placeholder="0">
+          </div>
+          <div>
+            <label for="edit-item-stock" class="field-label">Stock (Pieces)</label>
+            <input type="number" id="edit-item-stock" class="field-input" min="0" step="1" placeholder="0">
+          </div>
+        </div>
+        <span class="field-hint" id="edit-item-calc-hint">Calculates pieces based on sheets count.</span>
       </div>
       <div class="modal-actions">
         <button type="button" id="btn-cancel-item-edit" class="btn-secondary">← Back</button>
@@ -586,8 +655,8 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=7.7"></script>
-  <script src="js/supabase.js?v=7.7"></script>
-  <script src="js/app.js?v=7.7"></script>
+  <script src="js/config.js?v=7.8"></script>
+  <script src="js/supabase.js?v=7.8"></script>
+  <script src="js/app.js?v=7.8"></script>
 </body>
 </html>

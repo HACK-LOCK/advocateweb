@@ -66,6 +66,7 @@
   const btnBillActionEdit = document.getElementById('btn-bill-action-edit');
 
   let editingCustomerId = null;
+  let liveTotalNumber = 0;
   const btnSave = document.getElementById('btn-save');
   const btnCloseForm = document.getElementById('btn-close-form');
   const btnClosePrices = document.getElementById('btn-close-prices');
@@ -239,30 +240,54 @@
 
   // Initialization
   async function init() {
-    allPriceItems = await window.DataStore.getPriceItems();
-    renderPriceItemsInForm();
+    // 1. Immediately register all event listeners so navigation and actions work with 0 delay
+    try {
+      setupNavigation();
+      setupFormEvents();
+      setupItemPicker();
+      setupEnterKeyFlow();
+      setupSearch();
+      setupDrawer();
+      setupModals();
+      setupStockManagement();
+      setupActivityHistoryPage();
+      setupItemEditModal();
+      setupItemOptionsMenu();
+      setupCloudSettings();
+      setupBillShareModal();
+      setupKeyboardShortcuts();
+    } catch (evtErr) {
+      console.error('Error setting up event handlers:', evtErr);
+    }
 
-    fieldDate.value = getTodayDateString();
-    fieldTime.value = getCurrentTimeString();
+    if (fieldDate) fieldDate.value = getTodayDateString();
+    if (fieldTime) fieldTime.value = getCurrentTimeString();
 
-    loadDraft();
-    await loadAndRenderCustomers();
+    try {
+      loadDraft();
+    } catch (draftErr) {
+      console.warn('Error loading draft:', draftErr);
+    }
 
-    setupNavigation();
-    setupFormEvents();
-    setupItemPicker();
-    setupEnterKeyFlow();
-    setupSearch();
-    setupDrawer();
-    setupModals();
-    setupStockManagement();
-    setupActivityHistoryPage();
-    setupItemEditModal();
-    setupItemOptionsMenu();
-    setupCloudSettings();
-    setupBillShareModal();
-    setupKeyboardShortcuts();
-    updateDrawerCounts();
+    // 2. Load items & customers with resilient fallbacks
+    try {
+      allPriceItems = await window.DataStore.getPriceItems();
+      renderPriceItemsInForm();
+    } catch (itemsErr) {
+      console.warn('Initial price items load error:', itemsErr);
+    }
+
+    try {
+      await loadAndRenderCustomers();
+    } catch (custErr) {
+      console.warn('Initial customers load error:', custErr);
+    }
+
+    try {
+      updateDrawerCounts();
+    } catch (drawerErr) {
+      console.warn('Error updating drawer counts:', drawerErr);
+    }
   }
 
   // Navigation Logic
