@@ -53,8 +53,19 @@ const server = http.createServer((req, res) => {
   // Only public (anon) credentials are exposed here - never a service_role key.
   if (pathname === '/api/config') {
     const config = {
-      SUPABASE_URL: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL || '',
-      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY || ''
+      SUPABASE_URL:
+        process.env.SUPABASE_URL ||
+        process.env.NEXT_PUBLIC_SUPABASE_URL ||
+        process.env.VITE_SUPABASE_URL ||
+        process.env.PUBLIC_SUPABASE_URL ||
+        'https://fucneugflbekdybbdfes.supabase.co',
+      SUPABASE_ANON_KEY:
+        process.env.SUPABASE_ANON_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+        process.env.VITE_SUPABASE_ANON_KEY ||
+        process.env.PUBLIC_SUPABASE_ANON_KEY ||
+        'sb_publishable_uMmTd-bOmBUBQKRWSR1_fQ_KFPuC19_'
     };
     return send(res, 200, JSON.stringify(config), {
       'Content-Type': 'application/json; charset=utf-8',
