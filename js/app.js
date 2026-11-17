@@ -99,6 +99,36 @@
   let activeOptionsMenuItem = null;
   let activeOptionsMenuCallbacks = null;
 
+  // Advocate Profile & Chamber Information
+  const ADVOCATE_PROFILE = {
+    name: 'DEEPAK S. PRAJAPATI',
+    qualifications: 'B.A., LL.B.',
+    designation: 'ADVOCATE',
+    phones: [
+      { label: 'M', number: '93286 28803', raw: '9328628803' },
+      { label: 'M', number: '98981 22149', raw: '9898122149' }
+    ],
+    officeAddress: '166, Market Yard Complex, Opp. H.P. Petrol Pump, Talod-383215. (S.K.)',
+    residenceAddress: 'Desai Nagar Society, Talod, Ta. Talod, Dist : Sabarkantha - 383215',
+    district: 'Talod, Dist: Sabarkantha - 383215'
+  };
+
+  // Advocate Bill & Share Modal
+  const billShareModal = document.getElementById('bill-share-modal');
+  const btnBackBillModal = document.getElementById('btn-back-bill-modal');
+  const btnCloseBillModal = document.getElementById('btn-close-bill-modal');
+  const billLetterheadContainer = document.getElementById('bill-letterhead-container');
+  const billCustomPhoneBox = document.getElementById('bill-custom-phone-box');
+  const billTargetPhone = document.getElementById('bill-target-phone');
+  const btnBillActionWa = document.getElementById('btn-bill-action-wa');
+  const btnBillActionCopy = document.getElementById('btn-bill-action-copy');
+  const btnBillCopyLabel = document.getElementById('btn-bill-copy-label');
+  const btnBillActionPrint = document.getElementById('btn-bill-action-print');
+
+  let activeBillCustomer = null;
+  let activeBillItems = [];
+  let activeBillText = '';
+
   // Cloud Sync Modal (Kept for direct settings if needed)
   const cloudModal = document.getElementById('cloud-modal');
   const btnCloseCloudModal = document.getElementById('btn-close-cloud-modal');
@@ -200,6 +230,7 @@
     setupItemEditModal();
     setupItemOptionsMenu();
     setupCloudSettings();
+    setupBillShareModal();
     setupKeyboardShortcuts();
     updateDrawerCounts();
   }
@@ -318,6 +349,10 @@
       }
       if (itemHistoryModal && itemHistoryModal.style.display === 'flex') {
         itemHistoryModal.style.display = 'none';
+        return;
+      }
+      if (billShareModal && billShareModal.style.display === 'flex') {
+        closeBillShareModal();
         return;
       }
       if (stockHistoryModal && stockHistoryModal.style.display === 'flex') {
@@ -1616,28 +1651,45 @@
   }
 
   function generateWhatsAppBillText(customer, items) {
-    let msg = `*LEGAL CONSULTATION & BILL RECEIPT*\n`;
-    msg += `---------------------------------\n`;
-    msg += `*Client:* ${customer.name}\n`;
-    if (customer.customer_date) msg += `*Date:* ${customer.customer_date}\n`;
-    if (customer.case_time) msg += `*Time:* ${customer.case_time}\n`;
+    let msg = `*DEEPAK S. PRAJAPATI*\n`;
+    msg += `*(B.A., LL.B.) ADVOCATE*\n`;
+    msg += `-------------------------------------------\n`;
+    msg += `*M:* +91 93286 28803  |  *M:* +91 98981 22149\n`;
+    msg += `*Office:* 166, Market Yard Complex, Opp. H.P. Petrol Pump, Talod-383215. (S.K.)\n`;
+    msg += `*Resi:* Desai Nagar Society, Talod, Ta. Talod, Dist : Sabarkantha - 383215\n`;
+    msg += `===========================================\n`;
+    msg += `*LEGAL CONSULTATION & BILL RECEIPT*\n`;
+    msg += `===========================================\n`;
+    if (customer.customer_date) {
+      msg += `*Date:* ${customer.customer_date}`;
+      if (customer.case_time) msg += `  |  *Time:* ${customer.case_time}`;
+      msg += `\n`;
+    }
+    msg += `*Client Name:* ${customer.name}\n`;
+    if (customer.phone) msg += `*Contact:* ${customer.phone}\n`;
     if (customer.address) msg += `*Address:* ${customer.address}\n`;
-    if (customer.problem) msg += `*Details:* ${customer.problem}\n`;
-    msg += `---------------------------------\n`;
+    if (customer.problem) msg += `*Case / Matter:* ${customer.problem}\n`;
+    msg += `-------------------------------------------\n`;
+    msg += `*PARTICULARS / LEGAL SERVICES:*\n`;
 
     if (items && items.length > 0) {
-      msg += `*SERVICES / PARTICULARS:*\n`;
       items.forEach((it, idx) => {
         const qtyStr = getBillQuantitySuffix(it);
         const lineTot = it.line_total || (parseFloat(it.unit_price) * (it.quantity || 1));
-        msg += `${idx + 1}. ${it.item_name}${qtyStr} - ₹${lineTot}\n`;
+        msg += `${idx + 1}. ${it.item_name}${qtyStr} : ₹${lineTot}\n`;
       });
-      msg += `---------------------------------\n`;
+    } else if (parseFloat(customer.total) > 0) {
+      msg += `1. Legal Consultation / Services : ₹${customer.total}\n`;
+    } else {
+      msg += `1. Legal Consultation : ₹0.00\n`;
     }
 
+    msg += `-------------------------------------------\n`;
     msg += `*TOTAL AMOUNT: ₹${customer.total}*\n`;
-    msg += `---------------------------------\n`;
-    msg += `Thank you for choosing our legal services.`;
+    msg += `===========================================\n`;
+    msg += `Advocate: Deepak S. Prajapati\n`;
+    msg += `Talod, Dist: Sabarkantha - 383215\n`;
+    msg += `_Thank you for choosing our legal chamber._`;
     return msg;
   }
 
@@ -1648,6 +1700,167 @@
       p = '91' + p; // Default India prefix
     }
     return p;
+  }
+
+  function renderAdvocateLetterheadHtml(customer, items) {
+    const dateFormatted = customer.customer_date || '—';
+    const timeFormatted = customer.case_time ? customer.case_time.trim() : '';
+    const receiptRef = customer.id
+      ? `ADV-${(customer.customer_date || '').replace(/-/g, '') || 'REC'}-${String(customer.id).slice(0, 6).toUpperCase()}`
+      : 'ADV-RECEIPT';
+
+    let rowsHtml = '';
+    if (items && items.length > 0) {
+      rowsHtml = items.map((it, idx) => {
+        const qtyStr = getBillQuantitySuffix(it);
+        const unitPrice = parseFloat(it.unit_price) || 0;
+        const lineTot = it.line_total || (unitPrice * (it.quantity || 1));
+        return `
+          <tr>
+            <td class="col-num">${idx + 1}</td>
+            <td class="col-particulars">
+              <strong>${escapeHtml(it.item_name)}</strong>
+              ${qtyStr ? `<span class="bill-item-sub">${escapeHtml(qtyStr.trim())}</span>` : ''}
+            </td>
+            <td class="col-rate">₹${unitPrice.toFixed(2)}</td>
+            <td class="col-amount">₹${parseFloat(lineTot).toFixed(2)}</td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      rowsHtml = `
+        <tr>
+          <td class="col-num">1</td>
+          <td class="col-particulars">
+            <strong>Legal Consultation & Professional Services</strong>
+          </td>
+          <td class="col-rate">₹${parseFloat(customer.total || 0).toFixed(2)}</td>
+          <td class="col-amount">₹${parseFloat(customer.total || 0).toFixed(2)}</td>
+        </tr>
+      `;
+    }
+
+    return `
+      <div class="advocate-letterhead" id="printable-bill-area">
+        <div class="letterhead-header">
+          <div class="letterhead-crest">
+            <svg class="crest-svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>
+              <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>
+              <path d="M7 21h10"/>
+              <path d="M12 3v18"/>
+              <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
+            </svg>
+          </div>
+          <div class="letterhead-title-block">
+            <h2 class="advocate-title-name">${ADVOCATE_PROFILE.name}</h2>
+            <div class="advocate-title-qualifications">(${ADVOCATE_PROFILE.qualifications})</div>
+            <div class="advocate-title-designation">${ADVOCATE_PROFILE.designation}</div>
+          </div>
+        </div>
+
+        <div class="letterhead-contact-bar">
+          <div class="letterhead-phone-group">
+            <span class="lh-phone-label">M:</span>
+            <a href="tel:${ADVOCATE_PROFILE.phones[0].raw}" class="lh-phone-val">${ADVOCATE_PROFILE.phones[0].number}</a>
+          </div>
+          <span class="lh-contact-sep">|</span>
+          <div class="letterhead-phone-group">
+            <span class="lh-phone-label">M:</span>
+            <a href="tel:${ADVOCATE_PROFILE.phones[1].raw}" class="lh-phone-val">${ADVOCATE_PROFILE.phones[1].number}</a>
+          </div>
+        </div>
+
+        <div class="letterhead-addresses-box">
+          <div class="lh-address-line">
+            <span class="lh-address-tag">Office:</span>
+            <span class="lh-address-val">${escapeHtml(ADVOCATE_PROFILE.officeAddress)}</span>
+          </div>
+          <div class="lh-address-line">
+            <span class="lh-address-tag">Resi:</span>
+            <span class="lh-address-val">${escapeHtml(ADVOCATE_PROFILE.residenceAddress)}</span>
+          </div>
+        </div>
+
+        <div class="letterhead-divider-double"></div>
+
+        <div class="bill-receipt-headline">
+          <span class="headline-title">LEGAL CONSULTATION & BILL RECEIPT</span>
+          <span class="headline-ref">${receiptRef}</span>
+        </div>
+
+        <div class="bill-client-details-grid">
+          <div class="client-detail-col">
+            <div class="client-detail-row">
+              <span class="cd-label">Client Name:</span>
+              <span class="cd-value cd-client-name">${escapeHtml(customer.name)}</span>
+            </div>
+            <div class="client-detail-row">
+              <span class="cd-label">Phone:</span>
+              <span class="cd-value">${customer.phone ? escapeHtml(customer.phone) : '—'}</span>
+            </div>
+            <div class="client-detail-row">
+              <span class="cd-label">Address:</span>
+              <span class="cd-value">${customer.address ? escapeHtml(customer.address) : '—'}</span>
+            </div>
+          </div>
+          <div class="client-detail-col">
+            <div class="client-detail-row">
+              <span class="cd-label">Bill Date:</span>
+              <span class="cd-value">${escapeHtml(dateFormatted)}</span>
+            </div>
+            <div class="client-detail-row">
+              <span class="cd-label">Case Time:</span>
+              <span class="cd-value">${timeFormatted ? escapeHtml(timeFormatted) : '—'}</span>
+            </div>
+            <div class="client-detail-row">
+              <span class="cd-label">Status:</span>
+              <span class="cd-value cd-status-badge">Billed</span>
+            </div>
+          </div>
+          ${customer.problem ? `
+            <div class="client-detail-full">
+              <span class="cd-label">Matter / Case:</span>
+              <span class="cd-value">${escapeHtml(customer.problem)}</span>
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="bill-table-responsive">
+          <table class="bill-table">
+            <thead>
+              <tr>
+                <th class="col-num">#</th>
+                <th class="col-particulars">Particulars / Legal Services</th>
+                <th class="col-rate">Rate</th>
+                <th class="col-amount">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+            <tfoot>
+              <tr class="bill-grand-total-row">
+                <td colspan="3" class="total-caption">Total Amount Payable:</td>
+                <td class="total-figure">₹${parseFloat(customer.total || 0).toFixed(2)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="bill-footer-sign-area">
+          <div class="bill-footer-notice">
+            <span>Official legal invoice issued from chamber of Advocate Deepak S. Prajapati.</span>
+            <span>Talod, Dist: Sabarkantha - 383215</span>
+          </div>
+          <div class="bill-signature-block">
+            <div class="signature-line-mark"></div>
+            <div class="signature-advocate-name">${ADVOCATE_PROFILE.name}</div>
+            <div class="signature-advocate-title">Advocate (${ADVOCATE_PROFILE.qualifications})</div>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   // Create Customer Card DOM element (no per-card closures)
@@ -1705,18 +1918,20 @@
         </div>
       </div>
 
-      ${hasPhone ? `
-        <div class="card-actions">
+      <div class="card-actions">
+        ${hasPhone ? `
           <a href="tel:${escapeHtml(customer.phone)}" class="btn-card-action btn-call" aria-label="Call ${escapeHtml(customer.name)}">
             Call Client
           </a>
-          <button type="button" class="btn-card-action btn-whatsapp" aria-label="Share bill on WhatsApp">
-            Share Bill
-          </button>
-        </div>
-      ` : ''}
+        ` : ''}
+        <button type="button" class="btn-card-action btn-share-bill btn-whatsapp" aria-label="Share bill for ${escapeHtml(customer.name)}">
+          Share Bill
+        </button>
+      </div>
     `;
 
+    card._customer = customer;
+    card._items = items;
     card._cleanPhone = cleanPhone;
     card._billText = billText;
 
@@ -1725,14 +1940,126 @@
 
   // Delegated handler for customer card buttons
   function onCustomersGridClick(e) {
-    const waBtn = e.target.closest('.btn-whatsapp');
-    if (!waBtn) return;
+    const shareBtn = e.target.closest('.btn-share-bill, .btn-whatsapp');
+    if (!shareBtn) return;
 
-    const card = waBtn.closest('.customer-card');
-    if (!card || !card._cleanPhone || !card._billText) return;
+    const card = shareBtn.closest('.customer-card');
+    if (!card || !card._customer) return;
 
-    const waUrl = `https://wa.me/${card._cleanPhone}?text=${encodeURIComponent(card._billText)}`;
-    window.open(waUrl, '_blank');
+    openBillShareModal(card._customer, card._items);
+  }
+
+  // Advocate Bill & Share Modal Handling
+  function openBillShareModal(customer, items) {
+    if (!billShareModal || !billLetterheadContainer) return;
+
+    activeBillCustomer = customer;
+    activeBillItems = items || [];
+    activeBillText = generateWhatsAppBillText(customer, items);
+
+    // Render letterhead preview
+    billLetterheadContainer.innerHTML = renderAdvocateLetterheadHtml(customer, items);
+
+    // Setup custom phone field
+    const hasPhone = Boolean(customer.phone && customer.phone.trim());
+    if (billTargetPhone) {
+      billTargetPhone.value = customer.phone ? customer.phone.trim() : '';
+    }
+    if (billCustomPhoneBox) {
+      billCustomPhoneBox.style.display = hasPhone ? 'none' : 'block';
+    }
+
+    if (btnBillCopyLabel) {
+      btnBillCopyLabel.textContent = 'Copy Bill';
+    }
+
+    billShareModal.style.display = 'flex';
+    document.body.classList.add('modal-open');
+  }
+
+  function closeBillShareModal() {
+    if (!billShareModal) return;
+    billShareModal.style.display = 'none';
+    document.body.classList.remove('modal-open');
+    activeBillCustomer = null;
+    activeBillItems = [];
+    activeBillText = '';
+  }
+
+  function setupBillShareModal() {
+    if (btnBackBillModal) btnBackBillModal.addEventListener('click', closeBillShareModal);
+    if (btnCloseBillModal) btnCloseBillModal.addEventListener('click', closeBillShareModal);
+    if (billShareModal) {
+      billShareModal.addEventListener('click', (e) => {
+        if (e.target === billShareModal) closeBillShareModal();
+      });
+    }
+
+    if (btnBillActionWa) {
+      btnBillActionWa.addEventListener('click', () => {
+        if (!activeBillCustomer) return;
+
+        let phone = '';
+        if (activeBillCustomer.phone && activeBillCustomer.phone.trim()) {
+          phone = activeBillCustomer.phone.trim();
+        } else if (billTargetPhone && billTargetPhone.value.trim()) {
+          phone = billTargetPhone.value.trim();
+        }
+
+        if (!phone) {
+          if (billCustomPhoneBox) {
+            billCustomPhoneBox.style.display = 'block';
+            if (billTargetPhone) billTargetPhone.focus();
+          }
+          showToast('Please enter a 10-digit WhatsApp number');
+          return;
+        }
+
+        const clean = cleanPhoneForWhatsApp(phone);
+        const text = activeBillText || generateWhatsAppBillText(activeBillCustomer, activeBillItems);
+        const waUrl = `https://wa.me/${clean}?text=${encodeURIComponent(text)}`;
+        window.open(waUrl, '_blank');
+      });
+    }
+
+    if (btnBillActionCopy) {
+      btnBillActionCopy.addEventListener('click', async () => {
+        if (!activeBillCustomer) return;
+        const text = activeBillText || generateWhatsAppBillText(activeBillCustomer, activeBillItems);
+
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+          }
+
+          if (btnBillCopyLabel) {
+            btnBillCopyLabel.textContent = 'Copied!';
+            setTimeout(() => {
+              if (btnBillCopyLabel) btnBillCopyLabel.textContent = 'Copy Bill';
+            }, 2000);
+          }
+          showToast('Bill text copied to clipboard');
+        } catch (err) {
+          console.error('Failed to copy bill:', err);
+          showToast('Could not copy to clipboard');
+        }
+      });
+    }
+
+    if (btnBillActionPrint) {
+      btnBillActionPrint.addEventListener('click', () => {
+        window.print();
+      });
+    }
   }
 
   // Dynamic Top Search Handling

@@ -533,9 +533,57 @@
   <!-- Shared 3-dot options menu (positioned dynamically next to the clicked item) -->
   <div id="item-options-menu" class="item-options-menu" role="menu" style="display: none;"></div>
 
+  <!-- Advocate Legal Bill & Share Modal -->
+  <div id="bill-share-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content modal-content-md bill-modal-content">
+      <div class="form-header no-print">
+        <div class="modal-header-left">
+          <button type="button" id="btn-back-bill-modal" class="btn-modal-back" title="Back to customers" aria-label="Back">
+            <span class="btn-back-arrow">←</span>
+            <span>Back</span>
+          </button>
+          <div class="form-title-group">
+            <h3 class="form-title" style="font-size: 18px;">Advocate Bill & Receipt</h3>
+            <span class="field-hint">Official chamber letterhead invoice</span>
+          </div>
+        </div>
+        <button type="button" id="btn-close-bill-modal" class="btn-close-x" aria-label="Close Bill Modal" title="Close">✕</button>
+      </div>
+
+      <!-- Scrollable Letterhead Preview -->
+      <div class="bill-modal-scroll-area">
+        <div id="bill-letterhead-container" class="bill-letterhead-container">
+          <!-- Filled dynamically -->
+        </div>
+      </div>
+
+      <!-- Action Footer -->
+      <div class="bill-modal-actions no-print">
+        <div class="bill-phone-input-group" id="bill-custom-phone-box" style="display: none;">
+          <label for="bill-target-phone" class="field-label" style="font-size: 12px;">Recipient WhatsApp Number (10 digits)</label>
+          <input type="tel" id="bill-target-phone" class="field-input" placeholder="e.g. 9898122149">
+        </div>
+        <div class="modal-actions" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px;">
+          <button type="button" id="btn-bill-action-wa" class="btn-primary" style="flex: 1 1 140px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            <span>WhatsApp Share</span>
+          </button>
+          <button type="button" id="btn-bill-action-copy" class="btn-secondary" style="flex: 1 1 120px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            <span id="btn-bill-copy-label">Copy Bill</span>
+          </button>
+          <button type="button" id="btn-bill-action-print" class="btn-secondary" style="flex: 1 1 120px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            <span>Print Receipt</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
-  <script src="js/config.js?v=7.5"></script>
-  <script src="js/supabase.js?v=7.5"></script>
-  <script src="js/app.js?v=7.5"></script>
+  <script src="js/config.js?v=7.6"></script>
+  <script src="js/supabase.js?v=7.6"></script>
+  <script src="js/app.js?v=7.6"></script>
 </body>
 </html>
