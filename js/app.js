@@ -10,6 +10,7 @@
   const navSearch = document.getElementById('nav-search');
   const formContainer = document.getElementById('form-container');
   const searchSection = document.getElementById('search-section');
+  const headerSearchBar = document.getElementById('header-search-bar');
   const searchInput = document.getElementById('search-input');
   const btnClearSearch = document.getElementById('btn-clear-search');
   const draftBar = document.getElementById('draft-bar');
@@ -329,18 +330,21 @@
     if (tab === 'new-customer') {
       formContainer.style.display = 'block';
       if (searchSection) searchSection.style.display = 'none';
+      if (headerSearchBar) headerSearchBar.style.display = 'none';
       draftBar.style.display = 'none';
       if (floatingBottomBar) floatingBottomBar.style.display = 'none';
       fieldName.focus();
     } else if (tab === 'stock' || tab === 'history') {
       formContainer.style.display = 'none';
       if (searchSection) searchSection.style.display = 'none';
+      if (headerSearchBar) headerSearchBar.style.display = 'none';
       draftBar.style.display = 'none';
       if (floatingBottomBar) floatingBottomBar.style.display = 'none';
     } else {
-      // 'customers' view
+      // 'customers' (home) view — show search bar
       formContainer.style.display = 'none';
       if (searchSection) searchSection.style.display = 'none';
+      if (headerSearchBar) headerSearchBar.style.display = 'flex';
       if (floatingBottomBar) floatingBottomBar.style.display = 'block';
       checkAndShowDraftBar();
       loadAndRenderCustomers();
