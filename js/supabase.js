@@ -1386,6 +1386,58 @@ window.DataStore = {
     }
   },
 
+  async updateCustomerPayment(customerId, paidAmount) {
+    try {
+      const localCustomers = JSON.parse(window.localStorage.getItem('portal_customers') || '[]');
+      const nowIso = new Date().toISOString();
+      const existingIdx = localCustomers.findIndex(c => String(c.id) === String(customerId));
+      if (existingIdx === -1) return null;
+
+      const customer = localCustomers[existingIdx];
+      const total = parseFloat(customer.total || 0);
+      const paid = Math.max(0, parseFloat(paidAmount != null ? paidAmount : 0));
+      const status = (paid >= total && total > 0) ? 'paid' : (paid > 0 ? 'partial' : 'due');
+
+      customer.paid_amount = paid;
+      customer.payment_status = status;
+      customer.updated_at = nowIso;
+
+      localCustomers[existingIdx] = customer;
+      window.localStorage.setItem('portal_customers', JSON.stringify(localCustomers));
+      this._cache.customers = localCustomers;
+      this._cache.customersTime = Date.now();
+
+      await this.recordCustomerHistory({
+        customer_id: customerId,
+        customer_name: customer.name || 'Customer',
+        event_type: 'payment_update',
+        details: `Payment updated: Collected ₹${paid} of ₹${total} (Remaining Due: ₹${Math.max(0, total - paid)}, Status: ${status.toUpperCase()})`,
+        changed_fields: 'paid_amount, payment_status'
+      });
+
+      if (this.isSupabase() && isValidUuid(String(customerId))) {
+        try {
+          await this._supabaseFetch(`customers?id=eq.${customerId}`, {
+            method: 'PATCH',
+            headers: { 'Prefer': 'return=minimal' },
+            body: JSON.stringify({
+              paid_amount: paid,
+              payment_status: status,
+              updated_at: nowIso
+            })
+          });
+        } catch (e) {
+          console.warn('Supabase updateCustomerPayment sync failed, local state preserved:', e);
+        }
+      }
+
+      return customer;
+    } catch (err) {
+      console.error('Error in updateCustomerPayment:', err);
+      throw err;
+    }
+  },
+
   // Invalidate cache
   invalidateCache() {
     this._cache.customers = null;

@@ -64,7 +64,28 @@
 
   // Bill modal edit action
   const btnBillActionEdit = document.getElementById('btn-bill-action-edit');
+  const btnBillHeaderEdit = document.getElementById('btn-bill-header-edit');
+  const btnPayHalf = document.getElementById('btn-pay-half');
 
+  // Quick Payment Modal Elements
+  const quickPaymentModal = document.getElementById('quick-payment-modal');
+  const btnBackQuickPayment = document.getElementById('btn-back-quick-payment');
+  const btnCloseQuickPayment = document.getElementById('btn-close-quick-payment');
+  const qpCustomerName = document.getElementById('qp-customer-name');
+  const qpCustomerId = document.getElementById('qp-customer-id');
+  const qpTotalAmount = document.getElementById('qp-total-amount');
+  const qpTotalDisplay = document.getElementById('qp-total-display');
+  const qpPaidDisplay = document.getElementById('qp-paid-display');
+  const qpDueDisplay = document.getElementById('qp-due-display');
+  const qpBtnFullPaid = document.getElementById('qp-btn-full-paid');
+  const qpBtnHalfPaid = document.getElementById('qp-btn-half-paid');
+  const qpBtnFullDue = document.getElementById('qp-btn-full-due');
+  const qpSubFull = document.getElementById('qp-sub-full');
+  const qpSubHalf = document.getElementById('qp-sub-half');
+  const qpCashInput = document.getElementById('qp-cash-input');
+  const qpBtnSaveCustom = document.getElementById('qp-btn-save-custom');
+
+  let activeQpCustomer = null;
   let editingCustomerId = null;
   let liveTotalNumber = 0;
   const btnSave = document.getElementById('btn-save');
@@ -255,6 +276,7 @@
       setupItemOptionsMenu();
       setupCloudSettings();
       setupBillShareModal();
+      setupQuickPaymentModal();
       setupKeyboardShortcuts();
     } catch (evtErr) {
       console.error('Error setting up event handlers:', evtErr);
@@ -1627,6 +1649,15 @@
       });
     }
 
+    if (btnPayHalf) {
+      btnPayHalf.addEventListener('click', () => {
+        if (fieldPaidAmount) {
+          fieldPaidAmount.value = Math.round(liveTotalNumber / 2);
+          updateLiveTotal();
+        }
+      });
+    }
+
     if (btnPayZero) {
       btnPayZero.addEventListener('click', () => {
         if (fieldPaidAmount) {
@@ -2102,53 +2133,83 @@
     const timeFormatted = customer.case_time ? ` ${customer.case_time}` : '';
     const billText = generateWhatsAppBillText(customer, items);
 
+    const tot = parseFloat(customer.total) || 0;
+    const paid = parseFloat(customer.paid_amount !== undefined ? customer.paid_amount : tot) || 0;
+    const due = Math.max(0, tot - paid);
+    const isPaid = (due === 0 && tot > 0);
+    const isPartial = (paid > 0 && due > 0);
+    const badgeClass = isPaid ? 'badge-paid' : (isPartial ? 'badge-partial' : 'badge-due');
+    const badgeLabel = isPaid ? 'Paid' : (isPartial ? `Due: ₹${due}` : `Pending: ₹${due}`);
+
     card.innerHTML = `
       <div class="card-top">
-        <div class="card-datetime">
-          <span class="card-datetime-item">${escapeHtml(dateFormatted)}</span>
-          ${timeFormatted ? `<span class="card-datetime-item">${escapeHtml(timeFormatted.trim())}</span>` : ''}
+        <div class="card-header-bar">
+          <div class="card-datetime">
+            <span class="card-datetime-item">${escapeHtml(dateFormatted)}</span>
+            ${timeFormatted ? `<span class="card-datetime-item">${escapeHtml(timeFormatted.trim())}</span>` : ''}
+          </div>
+          <button type="button" class="btn-card-top-edit btn-edit-customer" aria-label="Edit bill for ${escapeHtml(customer.name)}" title="Edit Bill & Details">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            <span>Edit</span>
+          </button>
         </div>
+
         <h3 class="card-name">${escapeHtml(customer.name)}</h3>
         <p class="card-phone ${hasPhone ? 'present' : 'empty'}">${escapeHtml(phoneDisplay)}</p>
         ${customer.address ? `<p class="card-address">${escapeHtml(customer.address)}</p>` : ''}
         ${customer.problem ? `<div class="card-problem">${escapeHtml(customer.problem)}</div>` : ''}
         
-        ${(() => {
-          const tot = parseFloat(customer.total) || 0;
-          const paid = parseFloat(customer.paid_amount !== undefined ? customer.paid_amount : tot) || 0;
-          const due = Math.max(0, tot - paid);
-          const badgeHtml = (due === 0 && tot > 0)
-            ? '<span class="badge-payment badge-paid">Paid</span>'
-            : (paid > 0 && due > 0)
-              ? `<span class="badge-payment badge-partial">Due: ₹${due}</span>`
-              : `<span class="badge-payment badge-due">Pending: ₹${due}</span>`;
-          return `
-            <div class="card-bill-box">
-              ${itemsHtml}
-              <div class="card-bill-total-row">
-                <span>Total</span>
-                <span>₹${tot}</span>
-              </div>
-              <div class="card-bill-payment-row">
-                <span class="payment-paid-text">Paid: ₹${paid}</span>
-                ${badgeHtml}
-              </div>
+        <div class="card-bill-box">
+          <div class="card-bill-top-bar">
+            <span class="card-bill-label">Bill Breakdown</span>
+            <button type="button" class="btn-card-bill-pencil btn-edit-customer" title="Edit this bill">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              <span>Edit Bill</span>
+            </button>
+          </div>
+          ${itemsHtml}
+          <div class="card-bill-total-row">
+            <span>Total</span>
+            <span>₹${tot}</span>
+          </div>
+          <div class="card-bill-payment-row">
+            <div class="card-payment-amounts">
+              <span class="payment-paid-text">Collected: ₹${paid}</span>
+              ${due > 0 ? `<span class="payment-due-highlight">Pending: ₹${due}</span>` : ''}
             </div>
-          `;
-        })()}
+            <button type="button" class="btn-payment-quick-toggle ${badgeClass}" data-customer-id="${customer.id}" title="Click to change payment status (Paid / Pending)">
+              <span class="status-dot"></span>
+              <span class="status-label">${badgeLabel}</span>
+              <span class="status-arrow">▾</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="card-actions">
         ${hasPhone ? `
-          <a href="tel:${escapeHtml(customer.phone)}" class="btn-card-action btn-call" aria-label="Call ${escapeHtml(customer.name)}">
-            Call Client
+          <a href="tel:${escapeHtml(customer.phone)}" class="btn-card-action btn-call" aria-label="Call ${escapeHtml(customer.name)}" title="Call Client">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+            <span>Call</span>
           </a>
         ` : ''}
-        <button type="button" class="btn-card-action btn-edit-customer" aria-label="Edit bill and details for ${escapeHtml(customer.name)}">
-          Edit Bill
+        <button type="button" class="btn-card-action btn-edit-customer" aria-label="Edit bill and details for ${escapeHtml(customer.name)}" title="Edit Bill">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          <span>Edit Bill</span>
         </button>
-        <button type="button" class="btn-card-action btn-share-bill btn-whatsapp" aria-label="Share bill for ${escapeHtml(customer.name)}">
-          Share Bill
+        <button type="button" class="btn-card-action btn-share-bill btn-whatsapp" aria-label="Share bill for ${escapeHtml(customer.name)}" title="Share on WhatsApp">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+          </svg>
+          <span>Share Bill</span>
         </button>
       </div>
     `;
@@ -2163,6 +2224,15 @@
 
   // Delegated handler for customer card buttons
   function onCustomersGridClick(e) {
+    const payToggle = e.target.closest('.btn-payment-quick-toggle');
+    if (payToggle) {
+      const card = payToggle.closest('.customer-card');
+      if (card && card._customer) {
+        openQuickPaymentModal(card._customer);
+      }
+      return;
+    }
+
     const editBtn = e.target.closest('.btn-edit-customer');
     if (editBtn) {
       const card = editBtn.closest('.customer-card');
@@ -2218,6 +2288,108 @@
     activeBillText = '';
   }
 
+
+
+  // Quick Payment Status & Collection Modal
+  function openQuickPaymentModal(customer) {
+    if (!quickPaymentModal) return;
+    activeQpCustomer = customer;
+
+    const tot = parseFloat(customer.total) || 0;
+    const paid = parseFloat(customer.paid_amount !== undefined ? customer.paid_amount : tot) || 0;
+    const due = Math.max(0, tot - paid);
+    const half = Math.round(tot / 2);
+
+    if (qpCustomerName) qpCustomerName.textContent = customer.name || 'Client';
+    if (qpCustomerId) qpCustomerId.value = customer.id;
+    if (qpTotalAmount) qpTotalAmount.value = tot;
+    if (qpTotalDisplay) qpTotalDisplay.textContent = `₹${tot}`;
+    if (qpPaidDisplay) qpPaidDisplay.textContent = `₹${paid}`;
+    if (qpDueDisplay) qpDueDisplay.textContent = `₹${due}`;
+
+    if (qpSubFull) qpSubFull.textContent = `Collected ₹${tot}`;
+    if (qpSubHalf) qpSubHalf.textContent = `Collected ₹${half}`;
+
+    if (qpCashInput) {
+      qpCashInput.value = paid > 0 ? paid : '';
+      qpCashInput.placeholder = `e.g. ${tot}`;
+    }
+
+    quickPaymentModal.style.display = 'flex';
+    document.body.classList.add('modal-open');
+    if (qpCashInput) qpCashInput.focus();
+  }
+
+  function closeQuickPaymentModal() {
+    if (!quickPaymentModal) return;
+    quickPaymentModal.style.display = 'none';
+    document.body.classList.remove('modal-open');
+    activeQpCustomer = null;
+  }
+
+  async function handleQuickPaymentSet(amount) {
+    if (!activeQpCustomer) return;
+    const custId = activeQpCustomer.id;
+    const num = Math.max(0, parseFloat(amount != null ? amount : 0));
+    try {
+      const updated = await window.DataStore.updateCustomerPayment(custId, num);
+      if (updated) {
+        closeQuickPaymentModal();
+        await loadAndRenderCustomers();
+      }
+    } catch (err) {
+      console.error('Failed to update payment:', err);
+      alert('Could not update payment status. Please try again.');
+    }
+  }
+
+  function setupQuickPaymentModal() {
+    if (btnBackQuickPayment) btnBackQuickPayment.addEventListener('click', closeQuickPaymentModal);
+    if (btnCloseQuickPayment) btnCloseQuickPayment.addEventListener('click', closeQuickPaymentModal);
+    if (quickPaymentModal) {
+      quickPaymentModal.addEventListener('click', (e) => {
+        if (e.target === quickPaymentModal) closeQuickPaymentModal();
+      });
+    }
+
+    if (qpBtnFullPaid) {
+      qpBtnFullPaid.addEventListener('click', () => {
+        if (!activeQpCustomer) return;
+        handleQuickPaymentSet(activeQpCustomer.total || 0);
+      });
+    }
+
+    if (qpBtnHalfPaid) {
+      qpBtnHalfPaid.addEventListener('click', () => {
+        if (!activeQpCustomer) return;
+        const tot = parseFloat(activeQpCustomer.total || 0);
+        handleQuickPaymentSet(Math.round(tot / 2));
+      });
+    }
+
+    if (qpBtnFullDue) {
+      qpBtnFullDue.addEventListener('click', () => {
+        handleQuickPaymentSet(0);
+      });
+    }
+
+    if (qpBtnSaveCustom) {
+      qpBtnSaveCustom.addEventListener('click', () => {
+        const val = qpCashInput ? parseFloat(qpCashInput.value) : 0;
+        handleQuickPaymentSet(isNaN(val) ? 0 : val);
+      });
+    }
+
+    if (qpCashInput) {
+      qpCashInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const val = parseFloat(qpCashInput.value);
+          handleQuickPaymentSet(isNaN(val) ? 0 : val);
+        }
+      });
+    }
+  }
 
   // Edit Existing Customer & Bill
   function openCustomerForEdit(customer, items) {
@@ -2286,6 +2458,12 @@
     if (btnBackBillModal) btnBackBillModal.addEventListener('click', closeBillShareModal);
     if (btnBillActionEdit) {
       btnBillActionEdit.addEventListener('click', () => {
+        if (!activeBillCustomer) return;
+        openCustomerForEdit(activeBillCustomer, activeBillItems);
+      });
+    }
+    if (btnBillHeaderEdit) {
+      btnBillHeaderEdit.addEventListener('click', () => {
         if (!activeBillCustomer) return;
         openCustomerForEdit(activeBillCustomer, activeBillItems);
       });
