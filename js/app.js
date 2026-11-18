@@ -531,7 +531,6 @@
           <input type="checkbox" class="price-item-checkbox" ${isChecked ? 'checked' : ''} aria-label="${escapeHtml(item.name)}">
           <div class="price-item-text">
             <span class="price-item-name">${escapeHtml(item.name)}</span>
-            <span class="price-item-meta">${escapeHtml(packagingText)}</span>
             ${stockText ? `<span class="price-item-stock">${escapeHtml(stockText)}</span>` : ''}
           </div>
         </div>
@@ -1037,8 +1036,8 @@
       opt.innerHTML = `
         <div class="picker-option-main">
           <span class="picker-option-name">${escapeHtml(it.name)}</span>
-          <span class="picker-option-meta">${escapeHtml(packaging)}${stock ? ` • ${escapeHtml(stock)}` : ''}</span>
-          ${isSelected ? `<span class="picker-added">✓ Selected</span>` : ''}
+          ${stock ? `<span class="picker-option-meta">${escapeHtml(stock)}</span>` : ''}
+          ${isSelected ? `<span class="picker-added">Added</span>` : ''}
         </div>
         <div class="picker-option-price">
           ${formatCurrency(it.price)}<small>/${escapeHtml(unitLabel)}</small>
@@ -1496,10 +1495,31 @@
   }
 
   // Enter Key Navigation Flow across Form Inputs
+  // Double-Enter on empty field jumps to Problem/Case Details
+  let _enterEmptyCount = 0;
+  let _enterEmptyTimer = null;
+
+  function resetEnterEmptyCount() {
+    _enterEmptyCount = 0;
+    if (_enterEmptyTimer) { clearTimeout(_enterEmptyTimer); _enterEmptyTimer = null; }
+  }
+
   function setupEnterKeyFlow() {
     fieldName.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
+        if (!fieldName.value.trim()) {
+          _enterEmptyCount++;
+          if (_enterEmptyTimer) clearTimeout(_enterEmptyTimer);
+          if (_enterEmptyCount >= 2) {
+            resetEnterEmptyCount();
+            fieldProblem.focus();
+            return;
+          }
+          _enterEmptyTimer = setTimeout(resetEnterEmptyCount, 800);
+          return;
+        }
+        resetEnterEmptyCount();
         fieldPhone.focus();
       }
     });
@@ -1507,6 +1527,18 @@
     fieldPhone.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
+        if (!fieldPhone.value.trim()) {
+          _enterEmptyCount++;
+          if (_enterEmptyTimer) clearTimeout(_enterEmptyTimer);
+          if (_enterEmptyCount >= 2) {
+            resetEnterEmptyCount();
+            fieldProblem.focus();
+            return;
+          }
+          _enterEmptyTimer = setTimeout(resetEnterEmptyCount, 800);
+          return;
+        }
+        resetEnterEmptyCount();
         fieldAddress.focus();
       }
     });
@@ -1514,6 +1546,7 @@
     fieldAddress.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
+        resetEnterEmptyCount();
         fieldProblem.focus();
       }
     });
@@ -2203,6 +2236,13 @@
           </svg>
           <span>WhatsApp</span>
         </button>
+        <button type="button" class="btn-card-action btn-delete-bill" data-customer-id="${customer.id}" aria-label="Delete bill for ${escapeHtml(customer.name)}" title="Delete Bill">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          <span>Delete</span>
+        </button>
       </div>
     `;
 
@@ -2230,6 +2270,37 @@
       const card = editBtn.closest('.customer-card');
       if (card && card._customer) {
         openCustomerForEdit(card._customer, card._items);
+      }
+      return;
+    }
+
+    const deleteBtn = e.target.closest('.btn-delete-bill');
+    if (deleteBtn) {
+      const card = deleteBtn.closest('.customer-card');
+      if (card && card._customer) {
+        const cust = card._customer;
+        if (confirm(`Delete bill for "${cust.name}"?\n\nThis will remove the bill from the list. The record will be archived in Supabase.`)) {
+          deleteBtn.disabled = true;
+          deleteBtn.textContent = 'Deleting...';
+          window.DataStore.deleteCustomer(cust.id).then(ok => {
+            if (ok) {
+              card.remove();
+              const remaining = customersGrid.querySelectorAll('.customer-card');
+              if (remaining.length === 0 && emptyState) {
+                emptyState.style.display = 'block';
+                emptyState.textContent = 'No customers found';
+              }
+            } else {
+              deleteBtn.disabled = false;
+              deleteBtn.textContent = 'Delete';
+              alert('Could not delete bill. Please try again.');
+            }
+          }).catch(() => {
+            deleteBtn.disabled = false;
+            deleteBtn.textContent = 'Delete';
+            alert('Could not delete bill. Please try again.');
+          });
+        }
       }
       return;
     }

@@ -172,24 +172,22 @@
               <span class="live-pricing-total" id="live-total">₹0</span>
             </div>
 
-            <!-- Cash Paid & Remaining Due Tracking -->
+            <!-- Cash Paid & Remaining Due Tracking (Compact 2-line) -->
             <div class="payment-tracking-box">
-              <div class="payment-tracking-row">
-                <div class="payment-tracking-input-group">
-                  <label for="field-paid-amount" class="payment-field-label">Cash Received / Paid Amount (₹)</label>
+              <div class="payment-compact-row">
+                <label class="payment-compact-label">Cash Received</label>
+                <div class="payment-compact-input-group">
                   <div class="input-with-currency">
                     <span class="currency-prefix">₹</span>
                     <input type="number" id="field-paid-amount" class="field-input field-paid-input" min="0" step="any" placeholder="0">
                   </div>
-                </div>
-                <div class="payment-quick-actions">
-                  <button type="button" id="btn-pay-full" class="btn-quick-pay" title="Set paid amount equal to total">Full Paid</button>
-                  <button type="button" id="btn-pay-half" class="btn-quick-pay" title="Set paid amount to 50% half">Half (50%)</button>
-                  <button type="button" id="btn-pay-zero" class="btn-quick-pay" title="Set paid amount to 0 (Unpaid)">Due (₹0)</button>
+                  <button type="button" id="btn-pay-full" class="btn-quick-pay-sm" title="Full amount paid">Full</button>
+                  <button type="button" id="btn-pay-half" class="btn-quick-pay-sm" title="Half 50% paid">Half</button>
+                  <button type="button" id="btn-pay-zero" class="btn-quick-pay-sm" title="Mark as unpaid">₹0</button>
                 </div>
               </div>
               <div class="payment-due-summary">
-                <span class="payment-due-label">Remaining Balance Due:</span>
+                <span class="payment-due-label">Balance Due:</span>
                 <span class="payment-due-value" id="live-due-amount">₹0</span>
                 <span class="payment-status-badge badge-due" id="live-payment-status">Due</span>
               </div>

@@ -104,7 +104,7 @@ create table if not exists public.customer_history (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid references public.customers (id) on delete set null,
   customer_name text not null,
-  event_type text not null check (event_type in ('created', 'updated', 'deleted', 'info')),
+  event_type text not null check (event_type in ('created', 'updated', 'deleted', 'info', 'payment_update')),
   details text,
   changed_fields text,
   created_at timestamptz not null default now()
@@ -170,6 +170,27 @@ values
   ('10000000-0000-4000-8000-000000000003', 'Counter Fee (₹5 per piece)', 'Counter Fee', 5, 5, 'piece', 1, 0, 'Sold strictly per single piece · ₹5 per piece · no sheet unit', true),
   ('10000000-0000-4000-8000-000000000004', 'Counter Fee (₹20 per piece)', 'Counter Fee', 20, 20, 'piece', 1, 0, 'Sold strictly per single piece · ₹20 per piece · no sheet unit', true),
   ('10000000-0000-4000-8000-000000000005', 'Marriage Certificate / Stamp (2 pieces)', 'Marriage', 200, 0, 'pair', 2, 128, 'Sold per 2-pc unit · ₹200 for 2 pieces · price editable', true),
-  ('10000000-0000-4000-8000-000000000006', 'Notary (₹540 Base)', 'Notary', 440, 450, 'sheet', 108, 108, '1 sheet = 108 pcs · ₹450 base · sold at ₹440 per sheet', true),
+  ('10000000-0000-4000-8000-000000000006', 'Notary (₹540 Base)', 'Notary', 540, 540, 'sheet', 108, 108, '1 sheet = 108 pcs · ₹540 base · sold at ₹540 per sheet', true),
   ('10000000-0000-4000-8000-000000000007', 'Notary (₹900 Base)', 'Notary', 900, 900, 'sheet', 180, 180, '1 sheet = 180 pcs · ₹900 per sheet · auto price, editable', true)
 on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Soft-deleted bills archive table
+-- Bills deleted from the UI are archived here, never permanently lost
+-- ---------------------------------------------------------------------------
+create table if not exists public.deleted_bills (
+  id uuid primary key default gen_random_uuid(),
+  original_customer_id uuid,
+  customer_data jsonb not null,
+  bill_items jsonb,
+  deleted_at timestamptz not null default now(),
+  deleted_reason text
+);
+
+alter table public.deleted_bills enable row level security;
+
+drop policy if exists "Allow anon full access on deleted_bills" on public.deleted_bills;
+create policy "Allow anon full access on deleted_bills"
+  on public.deleted_bills for all
+  using (true)
+  with check (true);

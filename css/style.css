@@ -3216,3 +3216,85 @@ body.drawer-open {
   opacity: 0.7;
   margin-left: 1px;
 }
+
+
+/* =============================================
+   COMPACT PAYMENT SECTION - 2-line inline
+   ============================================= */
+.payment-compact-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.payment-compact-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+  min-width: 90px;
+}
+
+.payment-compact-input-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  flex-wrap: nowrap;
+}
+
+.payment-compact-input-group .input-with-currency {
+  flex: 1;
+  min-width: 90px;
+  max-width: 160px;
+}
+
+.payment-compact-input-group .field-paid-input {
+  height: 34px;
+  font-size: 14px;
+}
+
+.btn-quick-pay-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-width: 42px;
+  padding: 0 8px;
+  border: 1.5px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  background: var(--bg-secondary, #f9fafb);
+  color: var(--text-primary, #111827);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.btn-quick-pay-sm:hover {
+  background: var(--accent-color, #1d4ed8);
+  border-color: var(--accent-color, #1d4ed8);
+  color: #fff;
+}
+
+/* =============================================
+   DELETE BILL BUTTON ON CUSTOMER CARD
+   ============================================= */
+.btn-delete-bill {
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+  background: transparent !important;
+}
+
+.btn-delete-bill:hover {
+  background: #ef4444 !important;
+  color: #fff !important;
+}
+
+.btn-delete-bill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

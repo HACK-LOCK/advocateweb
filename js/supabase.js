@@ -64,14 +64,14 @@ const DEFAULT_PRICE_ITEMS = [
   },
   {
     id: '10000000-0000-4000-8000-000000000006',
-    name: 'Notary (₹450 Base)',
+    name: 'Notary (₹540 Base)',
     category: 'Notary',
-    price: 440,
-    baseCost: 450,
+    price: 540,
+    baseCost: 540,
     salesUnit: 'sheet',
     piecesPerUnit: 108,
     stockPieces: 108,
-    unitDescription: '1 sheet = 108 pcs · ₹450 base · sold at ₹440 per sheet',
+    unitDescription: '1 sheet = 108 pcs · ₹540 base · sold at ₹540 per sheet',
     is_active: true
   },
   {
@@ -89,7 +89,7 @@ const DEFAULT_PRICE_ITEMS = [
 ];
 
 const LEGACY_DEFAULT_ITEM_NAMES = new Set([
-  'notary - rs 540', 'notary (₹540)', 'notary (₹450 base)',
+  'notary - rs 540', 'notary (₹540)', 'notary (₹540 base)',
   'marriage ticket', 'marriage certificate / stamp',
   'court fee - rs 1', 'court fee - ₹1 (80 pieces)', 'counter fee (₹1 / 80 pieces)',
   'court fee - rs 2', 'court fee - ₹2 (160 pieces)', 'counter fee (₹2 / 160 pieces)',
@@ -1435,6 +1435,69 @@ window.DataStore = {
     } catch (err) {
       console.error('Error in updateCustomerPayment:', err);
       throw err;
+    }
+  },
+
+  // Soft-delete a customer bill: archive to deleted_bills, remove from UI/localStorage
+  async deleteCustomer(customerId) {
+    try {
+      const localCustomers = JSON.parse(window.localStorage.getItem('portal_customers') || '[]');
+      const idx = localCustomers.findIndex(c => String(c.id) === String(customerId));
+      if (idx === -1) return false;
+
+      const customer = localCustomers[idx];
+      const items = (this._cache.customerItems.get(customerId) || {}).items || customer.items || [];
+
+      // Archive to Supabase deleted_bills if connected
+      if (this.isSupabase() && isValidUuid(String(customerId))) {
+        try {
+          const payload = {
+            original_customer_id: customerId,
+            customer_data: JSON.stringify(customer),
+            bill_items: JSON.stringify(items),
+            deleted_at: new Date().toISOString(),
+            deleted_reason: 'User deleted'
+          };
+          await this._supabaseFetch('deleted_bills', {
+            method: 'POST',
+            headers: { 'Prefer': 'return=minimal' },
+            body: JSON.stringify(payload)
+          });
+
+          // Also delete from customers table in Supabase
+          await this._supabaseFetch(`customer_items?customer_id=eq.${customerId}`, {
+            method: 'DELETE',
+            headers: { 'Prefer': 'return=minimal' }
+          });
+          await this._supabaseFetch(`customers?id=eq.${customerId}`, {
+            method: 'DELETE',
+            headers: { 'Prefer': 'return=minimal' }
+          });
+        } catch (e) {
+          console.warn('Could not archive deleted bill to Supabase:', e);
+        }
+      }
+
+      // Record history
+      await this.recordCustomerHistory({
+        customer_id: customerId,
+        customer_name: customer.name || 'Customer',
+        event_type: 'deleted',
+        details: `Bill deleted (Total: ₹${customer.total || 0})`,
+        changed_fields: ''
+      });
+
+      // Remove from local storage
+      localCustomers.splice(idx, 1);
+      window.localStorage.setItem('portal_customers', JSON.stringify(localCustomers));
+      this._cache.customers = localCustomers;
+      this._cache.customersTime = Date.now();
+      this._cache.customerItems.delete(customerId);
+
+      return true;
+    } catch (err) {
+      console.error('Error in deleteCustomer:', err);
+      return false;
     }
   },
 
